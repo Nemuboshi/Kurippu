@@ -1,11 +1,13 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, globalShortcut } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, Menu } from 'electron';
 import { createMpvMain } from 'electron-mpv-video/main';
+import { debugEnabled } from './binaries';
 import { registerIpc } from './ipc';
 
-const DEBUG = Boolean(process.env.BORAM_DEBUG);
-
+const DEBUG = debugEnabled();
 let mainWindow: BrowserWindow | null = null;
+let hasSource = false;
+let quitting = false;
 const mpv = createMpvMain();
 
 function createWindow(): void {
@@ -23,27 +25,55 @@ function createWindow(): void {
     },
   });
 
-  if (process.env.ELECTRON_RENDERER_URL) {
+  if (process.env.ELECTRON_RENDERER_URL)
     win.loadURL(process.env.ELECTRON_RENDERER_URL);
-  } else {
-    win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
-  }
+  else win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
   mpv.attachWindow(win);
+  win.webContents.on('context-menu', (_event, params) => {
+    if (!params.isEditable) return;
+    Menu.buildFromTemplate([
+      { role: 'undo' },
+      { role: 'redo' },
+      { type: 'separator' },
+      { role: 'cut' },
+      { role: 'copy' },
+      { role: 'paste' },
+      { type: 'separator' },
+      { role: 'selectAll' },
+    ]).popup({ window: win });
+  });
   mainWindow = win;
+  win.on('close', (event) => {
+    if (quitting || !hasSource) return;
+    const answer = dialog.showMessageBoxSync(win, {
+      type: 'warning',
+      buttons: ['Cancel', 'Quit'],
+      defaultId: 0,
+      cancelId: 0,
+      message: 'Discard source and quit?',
+    });
+    if (answer === 0) event.preventDefault();
+    else quitting = true;
+  });
   win.on('closed', () => {
     mainWindow = null;
   });
 }
 
 app.whenReady().then(() => {
-  registerIpc(() => mainWindow);
+  registerIpc(
+    () => mainWindow,
+    (value: boolean) => {
+      hasSource = value;
+    },
+  );
   if (DEBUG) {
-    globalShortcut.register('F12', () => {
-      BrowserWindow.getFocusedWindow()?.webContents.toggleDevTools();
-    });
-    globalShortcut.register('CommandOrControl+R', () => {
-      BrowserWindow.getFocusedWindow()?.webContents.reload();
-    });
+    globalShortcut.register('F12', () =>
+      BrowserWindow.getFocusedWindow()?.webContents.toggleDevTools(),
+    );
+    globalShortcut.register('CommandOrControl+R', () =>
+      BrowserWindow.getFocusedWindow()?.webContents.reload(),
+    );
   }
   createWindow();
   app.on('activate', () => {
@@ -52,9 +82,9 @@ app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  quitting = true;
   void mpv.dispose();
 });
-
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

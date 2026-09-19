@@ -13,6 +13,10 @@ function basename(p: string): string {
   return p.split(/[\\/]/).at(-1) ?? p;
 }
 
+$effect(() => {
+  void api.setHasSource(source !== null);
+});
+
 function updateTitle(): void {
   if (!source) {
     document.title = 'kurippu';
@@ -35,6 +39,13 @@ function onProbed(): void {
   appState = 'encoder';
 }
 
+async function changeSource(): Promise<void> {
+  if (!(await api.confirmDialog('Discard current source?'))) return;
+  source = null;
+  appState = 'source';
+  updateTitle();
+}
+
 function onCancel(): void {
   source = null;
   appState = 'source';
@@ -42,10 +53,13 @@ function onCancel(): void {
 }
 </script>
 
-{#if appState === 'source'}
-  <SourcePage onLoad={(s) => void loadSource(s)} />
-{:else if appState === 'info' && source}
-  <InfoPage {source} onDone={onProbed} onCancel={onCancel} />
-{:else if appState === 'encoder' && source}
-  <EncoderPage {source} />
+<div class:hidden={appState !== 'source'}><SourcePage onLoad={(s) => void loadSource(s)} /></div>
+{#if source}
+  <div class:hidden={appState !== 'info'}><InfoPage {source} onDone={onProbed} onCancel={onCancel} /></div>
+  <div class:hidden={appState !== 'encoder'}><EncoderPage {source} onChangeSource={() => void changeSource()} /></div>
 {/if}
+
+<style>
+  div { height: 100%; }
+  .hidden { display: none; }
+</style>

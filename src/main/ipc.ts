@@ -1,10 +1,10 @@
 import { constants } from 'node:fs';
-import { access, mkdtemp, stat, unlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { access, mkdtemp, stat, unlink, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { app, type BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { FILE_EXTENSIONS } from '../engine/constants';
-import { resolveFfmpeg, resolveYtDlp } from './binaries';
+import { debugValue, resolveFfmpeg, resolveYtDlp } from './binaries';
 import { killAll, killProcess, runProcess } from './process';
 import {
   cleanupTempFiles,
@@ -13,7 +13,18 @@ import {
 } from './tempfiles';
 
 // Wires every ipcMain.handle channel the renderer can call.
-export function registerIpc(getWindow: () => BrowserWindow | null): void {
+export function registerIpc(
+  getWindow: () => BrowserWindow | null,
+  setHasSource: (value: boolean) => void,
+): void {
+  ipcMain.handle('app:setHasSource', (_e, value: boolean) =>
+    setHasSource(value),
+  );
+  ipcMain.handle('app:desktopPath', () => app.getPath('desktop'));
+  ipcMain.handle('app:debugSettings', () => ({
+    tab: debugValue('TAB') ?? null,
+    format: debugValue('FORMAT') ?? null,
+  }));
   ipcMain.handle('bin:ffmpeg', () => resolveFfmpeg());
   ipcMain.handle('bin:ytdlp', () => resolveYtDlp());
 
@@ -35,6 +46,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return path;
   });
 
+  ipcMain.handle('fs:writeText', (_e, path: string, text: string) =>
+    writeFile(path, text, 'utf8'),
+  );
   ipcMain.handle('fs:deleteFiles', async (_e, paths: string[]) => {
     await Promise.allSettled(paths.map((p) => unlink(p)));
   });

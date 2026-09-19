@@ -1,8 +1,11 @@
-// Encode orchestration: spawns ffmpeg through the preload bridge, feeds
-// the progress bar from its output, and appends result stats to the log.
-
+// Encode orchestration and progress reporting.
 import { feedProgressLine, initProgress } from '../../engine/bitrate';
-import { getEncodeArgs, getTestArgs } from '../../engine/ffmpeg';
+import {
+  getConcatArgs,
+  getEncodeArgs,
+  getPreviewArgs,
+  getTestArgs,
+} from '../../engine/ffmpeg';
 import { validateOutputDir, validateOutputFile } from '../../engine/output';
 import { showTime } from '../../engine/time';
 
@@ -15,48 +18,46 @@ export interface EncodeRequest {
   container: 'mp4' | 'webm';
   duration: number;
   avgFrameRate: string;
+  preview: { path: string; time: number | null } | null;
+  sourcePath: string;
+  videoCodec: string;
+  width: number;
+  height: number;
+  sar: number;
+  hasAudio: boolean;
 }
-
 export interface EncodeEvents {
   log: (line: string) => void;
   progress: (percent: number) => void;
   finished: (outpath: string) => void;
 }
-
-// True while an encode runs. Exported as an object with a $state field so
-// the panel buttons can react to it.
 export const encoding: { current: boolean } = $state({ current: false });
-
 let procId: number | null = null;
 let offLog: (() => void) | null = null;
 let offStart: (() => void) | null = null;
 let savedTitle = '';
-
-function setTitle(outpath: string, percent: number | null): void {
-  const base = outpath.split(/[\\/]/).at(-1) ?? outpath;
+function setTitle(path: string, percent: number | null): void {
+  const base = path.split(/[\\/]/).at(-1) ?? path;
   document.title =
     percent == null ? savedTitle : `[${percent.toFixed(1)}%] ${base}`;
 }
-
 function stopPipe(): void {
   offLog?.();
-  offLog = null;
   offStart?.();
+  offLog = null;
   offStart = null;
   procId = null;
 }
-
 function describeExit(code: number | null, signal: string | null): string {
-  if (signal) return `killed by ${signal}`;
-  return `ffmpeg exited with ${code ?? 'unknown'}`;
+  return signal
+    ? `killed by ${signal}`
+    : `ffmpeg exited with ${code ?? 'unknown'}`;
 }
-
 interface RunResult {
   id: number;
   code: number | null;
   signal: string | null;
 }
-
 async function runPass(
   bin: string,
   args: string[],
@@ -65,46 +66,66 @@ async function runPass(
   events.log(`$ ffmpeg ${args.join(' ')}`);
   return window.kurippu.runProcess(bin, args);
 }
-
 export async function cancelEncode(): Promise<void> {
   if (procId != null) await window.kurippu.killProcess(procId);
 }
-
 export async function openOutput(path: string): Promise<void> {
   await window.kurippu.openPath(path);
 }
-
 export async function openFolder(path: string): Promise<void> {
   await window.kurippu.showItemInFolder(path);
 }
-
-async function statFile(
-  path: string,
-): Promise<{ size: number; mtimeMs: number } | null> {
-  const info = await window.kurippu.statPath(path);
-  return info.exists ? info : null;
-}
-
 async function logStats(
-  outpath: string,
+  path: string,
   duration: number,
-  elapsedMs: number,
-  events: EncodeEvents,
+  elapsed: number,
+  e: EncodeEvents,
 ): Promise<void> {
-  const st = await statFile(outpath);
-  events.log(`Output: ${outpath}`);
-  events.log(`Duration: ${showTime(duration)}`);
-  if (st) {
+  const st = await window.kurippu.statPath(path);
+  e.log(`Output: ${path}`);
+  e.log(`Duration: ${showTime(duration)}`);
+  if (st.exists) {
     const mbits = (st.size * 8) / 1e6;
-    const mib = st.size / 2 ** 20;
-    events.log(
-      `Bitrate: ${duration > 0 ? (mbits / duration).toFixed(3) : '?'} Mbps, ` +
-        `size: ${mib.toFixed(1)} MiB`,
+    e.log(
+      `Bitrate: ${duration > 0 ? (mbits / duration).toFixed(3) : '?'} Mbps, size: ${(st.size / 2 ** 20).toFixed(1)} MiB`,
     );
   }
-  events.log(`Elapsed: ${Math.round(elapsedMs / 1000)} s`);
+  e.log(`Elapsed: ${Math.round(elapsed / 1000)} s`);
 }
-
+async function encodeMain(
+  bin: string,
+  req: EncodeRequest,
+  path: string,
+  passlog: string,
+  e: EncodeEvents,
+  prog: ReturnType<typeof initProgress>,
+): Promise<boolean> {
+  const input = {
+    rawArgs: req.rawArgs,
+    title: req.title,
+    outpath: path,
+    passlog,
+  };
+  if (req.twoPass) {
+    prog.pass = 1;
+    const a = await runPass(bin, getEncodeArgs(input, 1), e);
+    if (a.code !== 0) {
+      e.log(describeExit(a.code, a.signal));
+      return false;
+    }
+    prog.pass = 2;
+    prog.lastFrame = 0;
+    const b = await runPass(bin, getEncodeArgs(input, 2), e);
+    if (b.code !== 0) {
+      e.log(describeExit(b.code, b.signal));
+      return false;
+    }
+    return true;
+  }
+  const r = await runPass(bin, getEncodeArgs(input, 0), e);
+  if (r.code !== 0) e.log(describeExit(r.code, r.signal));
+  return r.code === 0;
+}
 export async function startEncode(
   req: EncodeRequest,
   events: EncodeEvents,
@@ -113,32 +134,31 @@ export async function startEncode(
     await cancelEncode();
     return;
   }
-  const dirMatch = /^(.*)[\\/][^\\/]+$/.exec(req.outpath);
+  if (!req.rawArgs.trim()) {
+    events.log('Fix invalid parameters.');
+    return;
+  }
+  const dir = /^(.*)[\\/][^\\/]+$/.exec(req.outpath)?.[1] ?? '';
   if (req.kind === 'normal') {
-    const [dir, file] = await Promise.all([
-      window.kurippu.statPath(dirMatch?.[1] ?? ''),
+    const [ds, fs] = await Promise.all([
+      window.kurippu.statPath(dir),
       window.kurippu.statPath(req.outpath),
     ]);
-    if (
-      validateOutputDir(dirMatch?.[1] ?? '', dir) != null ||
-      validateOutputFile(file) != null
-    ) {
+    if (validateOutputDir(dir, ds) || validateOutputFile(fs)) {
       events.log('Fix invalid path.');
       return;
     }
   }
-
   const bin = await window.kurippu.resolveFfmpeg();
   if (!bin) {
     events.log('ffmpeg not found.');
     return;
   }
-
   encoding.current = true;
   savedTitle = document.title;
   const prog = initProgress(req.avgFrameRate, req.duration);
   events.progress(0);
-  const t0 = Date.now();
+  const started = Date.now();
   offStart = window.kurippu.onProcessStart((id) => {
     procId = id;
   });
@@ -151,65 +171,71 @@ export async function startEncode(
       setTitle(req.outpath, p);
     }
   });
-
   try {
     if (req.kind === 'test') {
-      const tmppath = await window.kurippu.makeTempPath('.mkv');
-      await window.kurippu.registerTempFile(tmppath);
-      const r = await runPass(bin, getTestArgs(req.rawArgs, tmppath), events);
+      const tmp = await window.kurippu.makeTempPath('.mkv');
+      const r = await runPass(bin, getTestArgs(req.rawArgs, tmp), events);
       if (r.code === 0) {
-        events.log(`Test encode done: ${tmppath}`);
-        await openOutput(tmppath);
-      } else {
-        events.log(describeExit(r.code, r.signal));
-      }
-    } else if (req.twoPass) {
-      // The main process owns temp paths and cleanup.
-      const passlog = await window.kurippu.makeTempPath('.log');
-      const input = {
-        rawArgs: req.rawArgs,
-        title: req.title,
-        outpath: req.outpath,
-        passlog,
-      };
-      prog.pass = 1;
-      const r1 = await runPass(bin, getEncodeArgs(input, 1), events);
-      if (r1.code !== 0) {
-        events.log(describeExit(r1.code, r1.signal));
-        return;
-      }
-      prog.pass = 2;
-      prog.lastFrame = 0;
-      const r2 = await runPass(bin, getEncodeArgs(input, 2), events);
-      if (r2.code !== 0) {
-        events.log(describeExit(r2.code, r2.signal));
-        return;
-      }
-      events.progress(100);
-      await logStats(req.outpath, req.duration, Date.now() - t0, events);
-      events.finished(req.outpath);
-    } else {
-      const r = await runPass(
+        events.log(`Test encode done: ${tmp}`);
+        await openOutput(tmp);
+      } else events.log(describeExit(r.code, r.signal));
+      return;
+    }
+    let main = req.outpath;
+    let previewPath = '';
+    let listPath = '';
+    if (req.preview) {
+      main = await window.kurippu.makeTempPath(`.${req.container}`);
+      previewPath = await window.kurippu.makeTempPath(`.${req.container}`);
+      listPath = await window.kurippu.makeTempPath('.txt');
+    }
+    const passlog = await window.kurippu.makeTempPath('-0.log');
+    if (!(await encodeMain(bin, req, main, passlog, events, prog))) return;
+    if (req.preview) {
+      const p = await runPass(
         bin,
-        getEncodeArgs(
-          {
-            rawArgs: req.rawArgs,
-            title: req.title,
-            outpath: req.outpath,
-            passlog: '',
-          },
-          0,
-        ),
+        getPreviewArgs({
+          inpath: req.preview.path,
+          time: req.preview.time,
+          vcodec: req.videoCodec,
+          outfmt: req.container,
+          outpath: previewPath,
+          width: req.width,
+          height: req.height,
+          sar: req.sar,
+          fps: req.avgFrameRate,
+        }),
         events,
       );
-      if (r.code !== 0) {
-        events.log(describeExit(r.code, r.signal));
+      if (p.code !== 0) {
+        events.log(describeExit(p.code, p.signal));
         return;
       }
-      events.progress(100);
-      await logStats(req.outpath, req.duration, Date.now() - t0, events);
-      events.finished(req.outpath);
+      const quote = (s: string) => s.replace(/'/g, "'\\''");
+      await window.kurippu.writeText(
+        listPath,
+        `file '${quote(previewPath)}'\n`,
+      );
+      const c = await runPass(
+        bin,
+        getConcatArgs({
+          listpath: listPath,
+          mainpath: main,
+          hasAudio: req.hasAudio,
+          fps: Number(req.avgFrameRate) || 25,
+          outfmt: req.container,
+          outpath: req.outpath,
+        }),
+        events,
+      );
+      if (c.code !== 0) {
+        events.log(describeExit(c.code, c.signal));
+        return;
+      }
     }
+    events.progress(100);
+    await logStats(req.outpath, req.duration, Date.now() - started, events);
+    events.finished(req.outpath);
   } finally {
     stopPipe();
     encoding.current = false;

@@ -29,6 +29,7 @@ let progress = $state(0);
 let statusLine = $state('');
 let procId = $state<number | null>(null);
 let outpath = $state('');
+let offStart: (() => void) | null = null;
 
 const api = window.kurippu;
 
@@ -105,8 +106,15 @@ async function startDownload(): Promise<void> {
     outpath,
     ffmpeg,
   );
+  offStart?.();
+  offStart = api.onProcessStart((id) => {
+    procId = id;
+  });
   const r = await api.runProcess(ytdlp, args);
   off();
+  offStart?.();
+  offStart = null;
+  procId = null;
   if (r.code === 0) {
     onLoad({
       path: outpath,
@@ -120,7 +128,10 @@ async function startDownload(): Promise<void> {
 }
 
 async function cancelDownload(): Promise<void> {
-  if (procId != null) api.killProcess(procId);
+  if (procId != null) await api.killProcess(procId);
+  offStart?.();
+  offStart = null;
+  procId = null;
   const subExt = info?.requested_subtitles?.[sid]?.ext ?? 'srt';
   downloading = false;
   info = null;

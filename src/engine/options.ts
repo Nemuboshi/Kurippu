@@ -92,6 +92,9 @@ export interface TrackInfo {
   lang?: string;
   channels?: number;
   fps?: number;
+  sampleRate?: number;
+  bitrate?: number;
+  profile?: string;
 }
 
 export interface MediaInfo {
@@ -103,6 +106,10 @@ export interface MediaInfo {
   vtracks: TrackInfo[];
   atracks: TrackInfo[];
   stracks: TrackInfo[];
+  title?: string;
+  bitrate?: number;
+  fileSize?: number;
+  format?: string;
   vtrackn?: number; // selected video track index; 0 when omitted
 }
 

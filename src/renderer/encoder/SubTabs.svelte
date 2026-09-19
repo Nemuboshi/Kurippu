@@ -9,8 +9,17 @@ interface Props {
   audio?: Snippet;
   codecs?: Snippet;
   encode?: Snippet;
+  disabled?: boolean;
 }
-const { store, info, video, audio, codecs, encode }: Props = $props();
+const {
+  store,
+  info,
+  video,
+  audio,
+  codecs,
+  encode,
+  disabled = false,
+}: Props = $props();
 
 const tabs: { id: SubTab; label: string }[] = [
   { id: 'info', label: 'info' },
@@ -40,13 +49,14 @@ function issues(id: SubTab): { errors: number; warnings: number } {
         class:active={store.activeTab === tab.id}
         class:has-errors={n.errors > 0}
         class:has-warnings={n.errors === 0 && n.warnings > 0}
+        {disabled}
         onclick={() => (store.activeTab = tab.id)}
       >
         {tab.label}
       </button>
     {/each}
   </div>
-  <div class="tab-body">
+  <fieldset class="tab-body" {disabled}>
     {#if store.activeTab === 'info'}
       {#if info}
         {@render info()}
@@ -62,7 +72,7 @@ function issues(id: SubTab): { errors: number; warnings: number } {
     {:else}
       {@render encode?.()}
     {/if}
-  </div>
+  </fieldset>
 </div>
 
 <style>
@@ -100,6 +110,9 @@ function issues(id: SubTab): { errors: number; warnings: number } {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    border: 0;
+    margin: 0;
+    padding: 0;
   }
   .placeholder {
     padding: 20px;

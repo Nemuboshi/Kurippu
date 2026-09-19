@@ -15,8 +15,21 @@ interface Props {
   onProbe?: (info: MediaInfo) => void;
   // Reports the playback position, used by the encode tab preview field.
   onTime?: (seconds: number) => void;
+  onMarkStart?: (seconds: number) => void;
+  onMarkEnd?: (seconds: number) => void;
+  crop?: CropRect | null;
+  disabled?: boolean;
 }
-const { src, onCrop, onProbe, onTime }: Props = $props();
+const {
+  src,
+  onCrop,
+  onProbe,
+  onTime,
+  onMarkStart,
+  onMarkEnd,
+  crop = null,
+  disabled = false,
+}: Props = $props();
 
 const backend: PlayerBackend = createPlayerBackend();
 
@@ -29,7 +42,7 @@ let mstart = $state<number | null>(null);
 let mend = $state<number | null>(null);
 let loop = $state(false);
 let fullscreen = $state(false);
-let crop = $state<CropRect | null>(null);
+let liveCrop = $state<CropRect | null>(null);
 let probe = $state<MediaInfo | null>(null);
 let containerEl = $state<HTMLElement | null>(null);
 let videoEl = $state<HTMLElement | null>(null);
@@ -46,7 +59,7 @@ $effect(() => {
     videoW = container.clientWidth;
     videoH = container.clientHeight;
     // Geometry changed, so container-pixel crop state is stale.
-    crop = null;
+    liveCrop = null;
     onCrop?.(null);
   });
   ro.observe(containerEl);
@@ -107,12 +120,20 @@ function seek(t: number): void {
 
 function _markStart(): void {
   mstart = time;
-  if (mend !== null && mend <= time) mend = null;
+  if (mend !== null && mend <= time) {
+    mend = null;
+    onMarkEnd?.(duration);
+  }
+  onMarkStart?.(time);
 }
 
 function _markEnd(): void {
   mend = time;
-  if (mstart !== null && mstart >= time) mstart = null;
+  if (mstart !== null && mstart >= time) {
+    mstart = null;
+    onMarkStart?.(0);
+  }
+  onMarkEnd?.(time);
 }
 
 function setVolume(v: number): void {
@@ -132,7 +153,7 @@ function toggleFullscreen(): void {
 }
 
 function _onKeydown(e: KeyboardEvent): void {
-  if (e.target instanceof HTMLInputElement) return;
+  if (disabled || e.target instanceof HTMLInputElement) return;
   switch (e.key) {
     case ' ':
       e.preventDefault();
@@ -176,6 +197,7 @@ function _onKeydown(e: KeyboardEvent): void {
 }
 
 function _onWheel(e: WheelEvent): void {
+  if (disabled) return;
   e.preventDefault();
   backend.frameStep(e.deltaY < 0 ? 1 : -1);
 }
@@ -183,7 +205,7 @@ function _onWheel(e: WheelEvent): void {
 function onFullscreenChange(): void {
   fullscreen = document.fullscreenElement !== null;
   // Fullscreen changes the geometry, so the crop overlay is stale.
-  crop = null;
+  liveCrop = null;
   onCrop?.(null);
 }
 
@@ -194,7 +216,7 @@ $effect(() => {
 });
 
 function _onCropChange(c: CropRect | null): void {
-  crop = c;
+  liveCrop = c;
   onCrop?.(c);
 }
 </script>
@@ -208,14 +230,14 @@ function _onCropChange(c: CropRect | null): void {
   aria-label="video player"
   onkeydown={_onKeydown}
 >
-  <div class="video" bind:this={videoEl} onclick={togglePlay} onwheel={_onWheel}>
+  <div class="video" bind:this={videoEl} onclick={() => { if (!disabled) togglePlay(); }} onwheel={_onWheel}>
     {#if _vr && probe?.vtracks[0]}
       {@const vtrack = probe.vtracks[0]}
       <CropOverlay
         vr={_vr}
         vwidth={vtrack.width ?? 0}
         vheight={vtrack.height ?? 0}
-        {crop}
+        crop={liveCrop ?? crop}
         onCrop={_onCropChange}
       />
     {/if}
@@ -232,6 +254,7 @@ function _onCropChange(c: CropRect | null): void {
     {volume}
     hasAudio={(probe?.atracks.length ?? 0) > 0}
     {fullscreen}
+    {disabled}
     onTogglePlay={togglePlay}
     onMarkStart={_markStart}
     onMarkEnd={_markEnd}

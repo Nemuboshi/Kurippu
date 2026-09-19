@@ -114,6 +114,10 @@ export class EncoderStore {
   );
 
   constructor() {
+    void window.kurippu.debugSettings().then(({ tab }) => {
+      if (tab && ['info', 'video', 'audio', 'codecs', 'encode'].includes(tab))
+        this.activeTab = tab as SubTab;
+    });
     $effect(() => {
       // Regenerate raw args whenever a valid derivation produces new args.
       // Manual edits survive until the next param change.

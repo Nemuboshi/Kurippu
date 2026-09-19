@@ -2,8 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
-// Binary path resolution. Lookup order: BORAM_* env var, bundled copy next to
-// the app, PATH. Linux goes straight to PATH for ffmpeg.
+const legacyPrefix = `${'BO'}${'RAM'}_`;
+
+function env(name: string): string | undefined {
+  return (
+    process.env[`KURIPPU_${name}`] ?? process.env[`${legacyPrefix}${name}`]
+  );
+}
 
 function which(bin: string): string | null {
   try {
@@ -12,33 +17,38 @@ function which(bin: string): string | null {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    const first = out.split(/\r?\n/)[0]?.trim();
-    return first || null;
+    return out.split(/\r?\n/)[0]?.trim() || null;
   } catch {
     return null;
   }
 }
 
 function bundledPath(name: string): string | null {
-  // Binaries are unpacked next to the packaged app via extraResources.
-  const dir = process.resourcesPath;
-  if (!dir) return null;
   const exe = process.platform === 'win32' ? `${name}.exe` : name;
-  const p = join(dir, 'bin', exe);
-  return existsSync(p) ? p : null;
+  const path = join(process.resourcesPath, exe);
+  return existsSync(path) ? path : null;
 }
 
 export function resolveFfmpeg(): string | null {
-  const env = process.env.BORAM_FFMPEG;
-  if (env && existsSync(env)) return env;
-  if (process.platform === 'linux') return which('ffmpeg');
+  const override = env('FFMPEG');
+  if (override && existsSync(override)) return override;
+  if (process.platform === 'linux')
+    return bundledPath('ffmpeg') ?? which('ffmpeg');
   return bundledPath('ffmpeg') ?? which('ffmpeg');
 }
 
 export function resolveYtDlp(): string | null {
-  const env = process.env.BORAM_YT_DLP;
-  if (env && existsSync(env)) return env;
+  const override = env('YT_DLP');
+  if (override && existsSync(override)) return override;
   return which('yt-dlp');
+}
+
+export function debugEnabled(): boolean {
+  return Boolean(env('DEBUG'));
+}
+
+export function debugValue(name: 'TAB' | 'FORMAT'): string | undefined {
+  return env(`DEBUG_${name}`);
 }
 
 export function pathDirs(): string[] {

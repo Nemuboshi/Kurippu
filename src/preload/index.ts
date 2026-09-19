@@ -5,6 +5,11 @@ import { exposeMpvApi } from 'electron-mpv-video/preload';
 // the renderer never touches Node or Electron directly.
 const api = {
   platform: process.platform,
+  setHasSource: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('app:setHasSource', value),
+  desktopPath: (): Promise<string> => ipcRenderer.invoke('app:desktopPath'),
+  debugSettings: (): Promise<{ tab: string | null; format: string | null }> =>
+    ipcRenderer.invoke('app:debugSettings'),
 
   resolveFfmpeg: (): Promise<string | null> => ipcRenderer.invoke('bin:ffmpeg'),
   resolveYtDlp: (): Promise<string | null> => ipcRenderer.invoke('bin:ytdlp'),
@@ -40,6 +45,8 @@ const api = {
     ipcRenderer.invoke('temp:unregister', path),
   makeTempPath: (ext: string): Promise<string> =>
     ipcRenderer.invoke('temp:makePath', ext),
+  writeText: (path: string, text: string): Promise<void> =>
+    ipcRenderer.invoke('fs:writeText', path, text),
   deleteFiles: (paths: string[]): Promise<void> =>
     ipcRenderer.invoke('fs:deleteFiles', paths),
   statPath: (
