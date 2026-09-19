@@ -1,4 +1,5 @@
 <script lang="ts">
+import EncoderPage from './EncoderPage.svelte';
 import InfoPage from './Info.svelte';
 import SourcePage from './Source.svelte';
 import type { AppState, Source } from './state';
@@ -46,5 +47,5 @@ function onCancel(): void {
 {:else if appState === 'info' && source}
   <InfoPage {source} onDone={onProbed} onCancel={onCancel} />
 {:else if appState === 'encoder' && source}
-  <p style="padding: 20px">Encoder lands in the next task. Source: {source.path}</p>
+  <EncoderPage {source} />
 {/if}

@@ -1,7 +1,8 @@
-import { access, mkdtemp, unlink } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, mkdtemp, stat, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { app, type BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, type BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { FILE_EXTENSIONS } from '../engine/constants';
 import { resolveFfmpeg, resolveYtDlp } from './binaries';
 import { killAll, killProcess, runProcess } from './process';
@@ -48,6 +49,39 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('fs:deleteFiles', async (_e, paths: string[]) => {
     await Promise.allSettled(paths.map((p) => unlink(p)));
   });
+  ipcMain.handle('fs:stat', async (_e, path: string) => {
+    try {
+      const info = await stat(path);
+      let writable = true;
+      try {
+        await access(path, constants.W_OK);
+      } catch {
+        writable = false;
+      }
+      return {
+        exists: true,
+        isDir: info.isDirectory(),
+        writable,
+        size: info.size,
+        mtimeMs: info.mtimeMs,
+      };
+    } catch {
+      return {
+        exists: false,
+        isDir: false,
+        writable: false,
+        size: 0,
+        mtimeMs: 0,
+      };
+    }
+  });
+  ipcMain.handle('shell:openPath', async (_e, path: string) => {
+    const error = await shell.openPath(path);
+    if (error) throw new Error(error);
+  });
+  ipcMain.handle('shell:showItemInFolder', (_e, path: string) =>
+    shell.showItemInFolder(path),
+  );
 
   ipcMain.handle('dialog:openVideo', async () => {
     const win = getWindow();

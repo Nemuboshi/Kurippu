@@ -26,6 +26,9 @@ export function runProcess(
   const id = nextId++;
   const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
   running.set(id, proc);
+  // The invocation only resolves when the process exits, so the id is
+  // pushed separately; the renderer needs it to cancel a running process.
+  if (!sender.isDestroyed()) sender.send('proc:start', id);
   let stdout = '';
   const onLog = (chunk: Buffer) => {
     const text = chunk.toString('utf8');

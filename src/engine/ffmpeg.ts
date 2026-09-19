@@ -1,5 +1,3 @@
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { AudioCodec, MTMode, VideoCodec } from './constants';
 import { escapeArg, escapeFilterPath, fileArg } from './escape';
 import { ceilFixed } from './time';
@@ -495,9 +493,4 @@ export function parseCropDetectOutput(output: string): CropArea | null {
   const y = grab('y');
   if (w == null || h == null || x == null || y == null) return null;
   return { w, h, x, y };
-}
-
-// Default temp passlog path for 2-pass encodes.
-export function defaultPasslog(): string {
-  return join(tmpdir(), `kurippu-${process.pid}-${Date.now()}-0.log`);
 }

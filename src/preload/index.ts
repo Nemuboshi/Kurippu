@@ -21,6 +21,11 @@ const api = {
   }> => ipcRenderer.invoke('proc:run', bin, args),
   killProcess: (id: number): Promise<void> =>
     ipcRenderer.invoke('proc:kill', id),
+  onProcessStart: (cb: (id: number) => void): (() => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, id: number) => cb(id);
+    ipcRenderer.on('proc:start', listener);
+    return () => ipcRenderer.removeListener('proc:start', listener);
+  },
   onProcessLog: (cb: (id: number, text: string) => void): (() => void) => {
     const listener = (
       _e: Electron.IpcRendererEvent,
@@ -39,6 +44,19 @@ const api = {
     ipcRenderer.invoke('temp:makePath', ext),
   deleteFiles: (paths: string[]): Promise<void> =>
     ipcRenderer.invoke('fs:deleteFiles', paths),
+  statPath: (
+    path: string,
+  ): Promise<{
+    exists: boolean;
+    isDir: boolean;
+    writable: boolean;
+    size: number;
+    mtimeMs: number;
+  }> => ipcRenderer.invoke('fs:stat', path),
+  openPath: (path: string): Promise<void> =>
+    ipcRenderer.invoke('shell:openPath', path),
+  showItemInFolder: (path: string): Promise<void> =>
+    ipcRenderer.invoke('shell:showItemInFolder', path),
 
   openVideoDialog: (): Promise<string | null> =>
     ipcRenderer.invoke('dialog:openVideo'),
