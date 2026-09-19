@@ -10,7 +10,10 @@
     "build": "electron-vite build",
     "check": "biome check . && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "start": "electron-vite preview"
+    "start": "electron-vite preview",
+    "fetch-binaries": "node scripts/fetch-binaries.ts",
+    "build:native": "pnpm --dir node_modules/electron-mpv-video build:native",
+    "package": "pnpm build && electron-builder"
   },
   "packageManager": "pnpm@12.4.2",
   "license": "GPL-3.0-only",
@@ -24,7 +27,9 @@
     "commitizen": "^4.3.2",
     "cz-conventional-changelog": "^3.3.0",
     "electron": "^44.4.2",
+    "electron-builder": "25.1.8",
     "electron-vite": "^5.0.0",
+    "extract-zip": "2.0.1",
     "husky": "^9.1.7",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
@@ -41,5 +46,46 @@
   "main": "out/main/index.js",
   "dependencies": {
     "electron-mpv-video": "0.1.1"
+  },
+  "build": {
+    "appId": "works.earendil.kurippu",
+    "productName": "Kurippu",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.node",
+      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.dll",
+      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.dylib",
+      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.so*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/${os}-${arch}",
+        "to": ".",
+        "filter": [
+          "ffmpeg",
+          "ffmpeg.exe"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.video"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo"
+    }
   }
 }

@@ -80,6 +80,41 @@ index 1da1aa4717d9ac78db237a9f19352e7acbf0772e..a6b800fd41d59073b91c8817175f2755
      setRenderSize(width: number, height: number): Promise<void>;
      setRenderMode(mode: RenderMode): Promise<void>;
      destroy(): Promise<void>;
+diff --git a/native/mpv-addon/binding.gyp b/native/mpv-addon/binding.gyp
+index 71461cabcde075dd04669f7d25df6cd91e5fb2d8..e6bc01ea391167943be7e41d762d42a126f304f2 100644
+--- a/native/mpv-addon/binding.gyp
++++ b/native/mpv-addon/binding.gyp
+@@ -9,12 +9,12 @@
+       "cflags_cc": ["-std=c++17"],
+       "defines": ["NAPI_DISABLE_CPP_EXCEPTIONS"],
+       "conditions": [
+-        ["OS=='mac' and target_arch=='arm64'", {
++        ["OS=='mac'", {
+           "include_dirs": [
+-            "<!(node -p \"process.env.MPV_INCLUDE_DIR || '/opt/homebrew/include'\")"
++            "<!(node -p \"process.env.MPV_INCLUDE_DIR || (process.arch === 'arm64' ? '/opt/homebrew/include' : '/usr/local/include')\")"
+           ],
+           "libraries": [
+-            "<!(node -p \"process.env.MPV_LIB || '/opt/homebrew/lib/libmpv.dylib'\")",
++            "<!(node -p \"process.env.MPV_LIB || (process.arch === 'arm64' ? '/opt/homebrew/lib/libmpv.dylib' : '/usr/local/lib/libmpv.dylib')\")",
+             "-framework OpenGL",
+             "-framework IOSurface",
+             "-framework CoreFoundation"
+@@ -24,6 +24,14 @@
+             "OTHER_CPLUSPLUSFLAGS": ["-std=c++17", "-fno-exceptions"]
+           }
+         }],
++        ["OS=='linux'", {
++          "include_dirs": [
++            "<!(node -p \"process.env.MPV_INCLUDE_DIR || '/usr/include'\")"
++          ],
++          "libraries": [
++            "<!(node -p \"process.env.MPV_LIB || '-lmpv'\")"
++          ]
++        }],
+         ["OS=='win'", {
+           "include_dirs": [
+             "<!(node -p \"process.env.MPV_INCLUDE_DIR || require('path').join(require('os').homedir(), 'libmpv', 'include')\")"
 diff --git a/native/mpv-addon/src/mpv_addon.cc b/native/mpv-addon/src/mpv_addon.cc
 index 46deaa65e65a7fc0f9ef4b5d7242b3998f479cb4..ffef6b8dc7a3bf594379a6e2ea90ba17812bcd3c 100644
 --- a/native/mpv-addon/src/mpv_addon.cc
@@ -87,7 +122,7 @@ index 46deaa65e65a7fc0f9ef4b5d7242b3998f479cb4..ffef6b8dc7a3bf594379a6e2ea90ba17
 @@ -122,6 +122,38 @@ void set_mpv_render_update_callback(mpv_render_context* context, MpvWakeupCallba
  }
  #endif
- 
+
 +Napi::Value node_to_js(Napi::Env env, const mpv_node& node) {
 +  switch (node.format) {
 +    case MPV_FORMAT_STRING:
@@ -134,7 +169,7 @@ index 46deaa65e65a7fc0f9ef4b5d7242b3998f479cb4..ffef6b8dc7a3bf594379a6e2ea90ba17
 @@ -347,6 +380,24 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
      return env.Undefined();
    }
- 
+
 +  Napi::Value GetProperty(const Napi::CallbackInfo& info) {
 +    Napi::Env env = info.Env();
 +    if (info.Length() < 1 || !info[0].IsString()) {
@@ -156,3 +191,81 @@ index 46deaa65e65a7fc0f9ef4b5d7242b3998f479cb4..ffef6b8dc7a3bf594379a6e2ea90ba17
    Napi::Value SetVolume(const Napi::CallbackInfo& info) {
      Napi::Env env = info.Env();
      if (info.Length() < 1 || !info[0].IsNumber()) {
+diff --git a/scripts/libmpv-runtime.mjs b/scripts/libmpv-runtime.mjs
+index 1fdc8f23009c0eef20b9fbf87cce973abf3eead6..69aece660b193d8903b8d10f0d4072a8ba6bc912 100644
+--- a/scripts/libmpv-runtime.mjs
++++ b/scripts/libmpv-runtime.mjs
+@@ -49,13 +49,20 @@ function copyMatching(sourceDir, extension) {
+ }
+
+ function configuredPaths() {
+-  if (target === 'darwin-arm64') {
++  if (target === 'darwin-arm64' || target === 'darwin-x64') {
++    const prefix = target === 'darwin-arm64' ? '/opt/homebrew' : '/usr/local'
+     return {
+-      includeDir: path.resolve(process.env.MPV_INCLUDE_DIR || '/opt/homebrew/include'),
+-      library: path.resolve(process.env.MPV_LIB || '/opt/homebrew/lib/libmpv.dylib'),
+-      runtimeDir: path.resolve(
+-        process.env.MPV_RUNTIME_DIR || '/opt/homebrew/opt/mpv/lib',
+-      ),
++      includeDir: path.resolve(process.env.MPV_INCLUDE_DIR || path.join(prefix, 'include')),
++      library: path.resolve(process.env.MPV_LIB || path.join(prefix, 'lib', 'libmpv.dylib')),
++      runtimeDir: path.resolve(process.env.MPV_RUNTIME_DIR || path.join(prefix, 'opt', 'mpv', 'lib')),
++    }
++  }
++
++  if (target === 'linux-x64') {
++    return {
++      includeDir: path.resolve(process.env.MPV_INCLUDE_DIR || '/usr/include'),
++      library: process.env.MPV_LIB || '/usr/lib/x86_64-linux-gnu/libmpv.so',
++      runtimeDir: path.resolve(process.env.MPV_RUNTIME_DIR || '/usr/lib/x86_64-linux-gnu'),
+     }
+   }
+
+@@ -86,7 +93,7 @@ function getMacInstallName(library) {
+ }
+
+ function check() {
+-  if (target === 'darwin-arm64') {
++  if (target === 'darwin-arm64' || target === 'darwin-x64' || target === 'linux-x64') {
+     const paths = configuredPaths()
+     validateHeaders(paths.includeDir)
+     requireFile(paths.library, 'libmpv link library')
+@@ -113,26 +120,28 @@ function stage() {
+   requireFile(addonPath, 'native addon')
+   mkdirSync(outputDir, { recursive: true })
+
+-  if (target === 'darwin-arm64') {
++  if (target === 'darwin-arm64' || target === 'darwin-x64') {
+     const paths = configuredPaths()
+     const stagedLibrary = path.join(outputDir, 'libmpv.dylib')
+     copyMatching(paths.runtimeDir, '.dylib')
+     copyRuntimeFile(paths.library, stagedLibrary)
+-
+     const installName = getMacInstallName(paths.library)
+     if (!installName) fail(`unable to read install name from: ${paths.library}`)
+-
+-    execFileSync('install_name_tool', [
+-      '-change', installName, '@loader_path/libmpv.dylib', addonPath,
+-    ])
+-    execFileSync('install_name_tool', [
+-      '-id', '@loader_path/libmpv.dylib', stagedLibrary,
+-    ])
++    execFileSync('install_name_tool', ['-change', installName, '@loader_path/libmpv.dylib', addonPath])
++    execFileSync('install_name_tool', ['-id', '@loader_path/libmpv.dylib', stagedLibrary])
+     execFileSync('codesign', ['--force', '--sign', '-', stagedLibrary])
+     console.log(`libmpv: staged macOS runtime in ${outputDir}`)
+     return
+   }
+
++  if (target === 'linux-x64') {
++    const paths = configuredPaths()
++    copyRuntimeFile(paths.library, path.join(outputDir, 'libmpv.so'))
++    execFileSync('patchelf', ['--set-rpath', '$ORIGIN', addonPath])
++    console.log(`libmpv: staged Linux runtime in ${outputDir}`)
++    return
++  }
++
+   if (target === 'win32-x64') {
+     const copied = copyMatching(configuredPaths().runtimeDir, '.dll')
+     if (copied.length === 0) fail('no runtime DLLs were staged')
