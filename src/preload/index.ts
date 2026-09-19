@@ -7,6 +7,8 @@ const api = {
 
   resolveFfmpeg: (): Promise<string | null> => ipcRenderer.invoke('bin:ffmpeg'),
   resolveYtDlp: (): Promise<string | null> => ipcRenderer.invoke('bin:ytdlp'),
+  probeSource: (path: string): Promise<boolean> =>
+    ipcRenderer.invoke('source:probe', path),
 
   runProcess: (
     bin: string,
@@ -33,6 +35,10 @@ const api = {
     ipcRenderer.invoke('temp:register', path),
   unregisterTempFile: (path: string): Promise<void> =>
     ipcRenderer.invoke('temp:unregister', path),
+  makeTempPath: (ext: string): Promise<string> =>
+    ipcRenderer.invoke('temp:makePath', ext),
+  deleteFiles: (paths: string[]): Promise<void> =>
+    ipcRenderer.invoke('fs:deleteFiles', paths),
 
   openVideoDialog: (): Promise<string | null> =>
     ipcRenderer.invoke('dialog:openVideo'),

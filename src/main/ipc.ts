@@ -1,3 +1,6 @@
+import { access, mkdtemp, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { app, type BrowserWindow, dialog, ipcMain } from 'electron';
 import { FILE_EXTENSIONS } from '../engine/constants';
 import { resolveFfmpeg, resolveYtDlp } from './binaries';
@@ -13,6 +16,17 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('bin:ffmpeg', () => resolveFfmpeg());
   ipcMain.handle('bin:ytdlp', () => resolveYtDlp());
 
+  // Probe stub: real track probing lands with the mpv addon. For now we
+  // accept any existing file; the no-video-track rejection comes later.
+  ipcMain.handle('source:probe', async (_e, path: string) => {
+    try {
+      await access(path);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
   ipcMain.handle('proc:run', (e, bin: string, args: string[]) => {
     const { id, done } = runProcess(e.sender, bin, args);
     return done.then((result) => ({ id, ...result }));
@@ -23,6 +37,17 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('temp:unregister', (_e, path: string) =>
     unregisterTempFile(path),
   );
+
+  ipcMain.handle('temp:makePath', async (_e, ext: string) => {
+    const dir = await mkdtemp(join(tmpdir(), 'boram-'));
+    const path = join(dir, `download${ext}`);
+    registerTempFile(path);
+    return path;
+  });
+
+  ipcMain.handle('fs:deleteFiles', async (_e, paths: string[]) => {
+    await Promise.allSettled(paths.map((p) => unlink(p)));
+  });
 
   ipcMain.handle('dialog:openVideo', async () => {
     const win = getWindow();
