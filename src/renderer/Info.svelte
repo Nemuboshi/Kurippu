@@ -1,4 +1,5 @@
 <script lang="ts">
+import { probeMpv } from './player/probe';
 import type { Source } from './state';
 
 interface Props {
@@ -10,14 +11,11 @@ const { source, onDone, onCancel }: Props = $props();
 
 let error = $state('');
 
-// Probe runs on mount; the mpv addon lands in a later task, so this only
-// checks that the file exists for now.
 $effect(() => {
   void (async () => {
     try {
-      const ok = await window.kurippu.probeSource(source.path);
-      if (!ok) error = 'No video tracks found';
-      else onDone();
+      await probeMpv(source.path);
+      onDone();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }

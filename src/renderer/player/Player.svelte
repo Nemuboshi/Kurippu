@@ -1,12 +1,11 @@
 <script lang="ts">
 import type { MediaInfo } from '../../engine/options';
-import { showTime } from '../../engine/time';
 import type { PlayerBackend } from './backend';
 import Controls from './Controls.svelte';
 import CropOverlay from './CropOverlay.svelte';
 import type { CropRect, VideoRect } from './math';
 import { letterbox, loopCheck, sarDisplay } from './math';
-import { createPlayerBackend } from './mock';
+import { createPlayerBackend } from './mpv';
 import SeekBar from './SeekBar.svelte';
 
 interface Props {
@@ -33,22 +32,28 @@ let fullscreen = $state(false);
 let crop = $state<CropRect | null>(null);
 let probe = $state<MediaInfo | null>(null);
 let containerEl = $state<HTMLElement | null>(null);
+let videoEl = $state<HTMLElement | null>(null);
 let videoW = $state(0);
 let videoH = $state(0);
 let controlsRef: ReturnType<typeof Controls> | null = null;
 
-// Tracks container size so the letterbox rect and crop overlay stay correct.
+// Attaches libmpv rendering and keeps the crop geometry in sync.
 $effect(() => {
-  if (!containerEl) return;
+  if (!containerEl || !videoEl) return;
+  backend.attach(videoEl);
+  const container = containerEl;
   const ro = new ResizeObserver(() => {
-    videoW = containerEl!.clientWidth;
-    videoH = containerEl!.clientHeight;
+    videoW = container.clientWidth;
+    videoH = container.clientHeight;
     // Geometry changed, so container-pixel crop state is stale.
     crop = null;
     onCrop?.(null);
   });
   ro.observe(containerEl);
-  return () => ro.disconnect();
+  return () => {
+    ro.disconnect();
+    backend.detach();
+  };
 });
 
 // Loads the source and wires backend time into local state.
@@ -57,7 +62,8 @@ $effect(() => {
   let cancelled = false;
   void (async () => {
     try {
-      const info = await backend.probe(src ?? 'mock://blank');
+      if (!src) return;
+      const info = await backend.probe(src);
       if (cancelled) return;
       probe = info;
       duration = info.duration;
@@ -82,16 +88,12 @@ $effect(() => {
   };
 });
 
-const vr = $derived.by<VideoRect | null>(() => {
+const _vr = $derived.by<VideoRect | null>(() => {
   const v = probe?.vtracks[0];
   if (!v?.width || !v.height || videoW === 0 || videoH === 0) return null;
   const { dw, dh } = sarDisplay(v.width, v.height, v.sar ?? 1);
   return letterbox(videoW, videoH, dw, dh, v.width);
 });
-
-// The mock backend has no drawing surface, so it renders a gray canvas with
-// the current time instead. The mpv addon will draw into this area directly.
-const mockTime = $derived(showTime(time));
 
 function togglePlay(): void {
   backend.toggle();
@@ -103,12 +105,12 @@ function seek(t: number): void {
   time = backend.getTime();
 }
 
-function markStart(): void {
+function _markStart(): void {
   mstart = time;
   if (mend !== null && mend <= time) mend = null;
 }
 
-function markEnd(): void {
+function _markEnd(): void {
   mend = time;
   if (mstart !== null && mstart >= time) mstart = null;
 }
@@ -129,7 +131,7 @@ function toggleFullscreen(): void {
   else if (containerEl) void containerEl.requestFullscreen();
 }
 
-function onKeydown(e: KeyboardEvent): void {
+function _onKeydown(e: KeyboardEvent): void {
   if (e.target instanceof HTMLInputElement) return;
   switch (e.key) {
     case ' ':
@@ -173,7 +175,7 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
-function onWheel(e: WheelEvent): void {
+function _onWheel(e: WheelEvent): void {
   e.preventDefault();
   backend.frameStep(e.deltaY < 0 ? 1 : -1);
 }
@@ -191,7 +193,7 @@ $effect(() => {
     document.removeEventListener('fullscreenchange', onFullscreenChange);
 });
 
-function onCropChange(c: CropRect | null): void {
+function _onCropChange(c: CropRect | null): void {
   crop = c;
   onCrop?.(c);
 }
@@ -204,18 +206,17 @@ function onCropChange(c: CropRect | null): void {
   tabindex="0"
   role="application"
   aria-label="video player"
-  onkeydown={onKeydown}
+  onkeydown={_onKeydown}
 >
-  <div class="video" onclick={togglePlay} onwheel={onWheel}>
-    <div class="mock-surface">{mockTime}</div>
-    {#if vr && probe?.vtracks[0]}
+  <div class="video" bind:this={videoEl} onclick={togglePlay} onwheel={_onWheel}>
+    {#if _vr && probe?.vtracks[0]}
       {@const vtrack = probe.vtracks[0]}
       <CropOverlay
-        {vr}
+        vr={_vr}
         vwidth={vtrack.width ?? 0}
         vheight={vtrack.height ?? 0}
         {crop}
-        onCrop={onCropChange}
+        onCrop={_onCropChange}
       />
     {/if}
   </div>
@@ -232,8 +233,8 @@ function onCropChange(c: CropRect | null): void {
     hasAudio={(probe?.atracks.length ?? 0) > 0}
     {fullscreen}
     onTogglePlay={togglePlay}
-    onMarkStart={markStart}
-    onMarkEnd={markEnd}
+    onMarkStart={_markStart}
+    onMarkEnd={_markEnd}
     onSeek={seek}
     onToggleLoop={() => (loop = !loop)}
     onToggleMute={toggleMute}
@@ -257,17 +258,5 @@ function onCropChange(c: CropRect | null): void {
     flex: 1;
     min-height: 0;
     overflow: hidden;
-  }
-  .mock-surface {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #9e9e9e;
-    color: #fff;
-    font-size: 48px;
-    font-variant-numeric: tabular-nums;
-    user-select: none;
   }
 </style>

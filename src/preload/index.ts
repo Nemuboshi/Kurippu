@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { exposeMpvApi } from 'electron-mpv-video/preload';
 
 // Renderer-facing API. Everything goes through invoke/handle channels;
 // the renderer never touches Node or Electron directly.
@@ -7,9 +8,6 @@ const api = {
 
   resolveFfmpeg: (): Promise<string | null> => ipcRenderer.invoke('bin:ffmpeg'),
   resolveYtDlp: (): Promise<string | null> => ipcRenderer.invoke('bin:ytdlp'),
-  probeSource: (path: string): Promise<boolean> =>
-    ipcRenderer.invoke('source:probe', path),
-
   runProcess: (
     bin: string,
     args: string[],
@@ -72,6 +70,7 @@ const api = {
     ipcRenderer.invoke('dialog:confirm', message),
 };
 
+exposeMpvApi();
 contextBridge.exposeInMainWorld('kurippu', api);
 
 export type KurippuApi = typeof api;

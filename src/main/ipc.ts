@@ -17,17 +17,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('bin:ffmpeg', () => resolveFfmpeg());
   ipcMain.handle('bin:ytdlp', () => resolveYtDlp());
 
-  // Probe stub: real track probing lands with the mpv addon. For now we
-  // accept any existing file; the no-video-track rejection comes later.
-  ipcMain.handle('source:probe', async (_e, path: string) => {
-    try {
-      await access(path);
-      return true;
-    } catch {
-      return false;
-    }
-  });
-
   ipcMain.handle('proc:run', (e, bin: string, args: string[]) => {
     const { id, done } = runProcess(e.sender, bin, args);
     return done.then((result) => ({ id, ...result }));

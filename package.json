@@ -38,5 +38,8 @@
     }
   },
   "pnpm": {},
-  "main": "out/main/index.js"
+  "main": "out/main/index.js",
+  "dependencies": {
+    "electron-mpv-video": "0.1.1"
+  }
 }
