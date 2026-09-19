@@ -401,8 +401,8 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
     if (info[0].As<Napi::Boolean>().Value()) {
       int added = command({"vf-add", "yadif"});
       if (added < 0) throw_mpv_error(env, "vf-add", added);
-    } else if (removed < 0 && removed != MPV_ERROR_PROPERTY_UNSET) {
-      // An unset property just means no filter was ever installed.
+    } else if (removed < 0 && removed != MPV_ERROR_PROPERTY_NOT_FOUND) {
+      // Not found just means no filter was ever installed.
       throw_mpv_error(env, "vf-remove", removed);
     }
     return env.Undefined();

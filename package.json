@@ -14,7 +14,7 @@
     "fetch-binaries": "node scripts/fetch-binaries.ts",
     "libmpv:check": "node --experimental-strip-types scripts/libmpv-runtime.ts check",
     "libmpv:stage": "node --experimental-strip-types scripts/libmpv-runtime.ts stage",
-    "build:native": "pnpm --dir native/mpv rebuild && pnpm libmpv:stage",
+    "build:native": "node-gyp rebuild --dir=native/mpv && pnpm libmpv:stage",
     "package": "pnpm build && electron-builder"
   },
   "packageManager": "pnpm@12.4.2",

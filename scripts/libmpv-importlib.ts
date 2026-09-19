@@ -8,7 +8,13 @@
 // Usage: pnpm tsx scripts/libmpv-importlib.ts
 // Requires the Visual Studio C++ build tools (dumpbin.exe + lib.exe).
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -24,55 +30,91 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-// Locates the Visual Studio Developer Command Prompt setup script, which is
-// the supported way to get dumpbin/lib plus the CRT they depend on on PATH.
-function findDevCmd(): string {
+// Locates the MSVC toolchain bin directory. The Visual Studio dev prompt
+// is the supported entry point, but the 17.14 BuildTools devcmd fails to
+// evaluate its own install path, so the tools are located directly instead.
+function findMsvcBin(): string {
   if (!existsSync(vswhere)) fail('vswhere not found; install the VS C++ tools');
-  const found = execFileSync(
+  const install = execFileSync(
     vswhere,
-    ['-latest', '-products', '*', '-requires', 'Microsoft.VisualStudio.Component.VC.Tools', '-find', '**\\VsDevCmd.bat'],
+    ['-latest', '-products', '*', '-property', 'installationPath'],
     { encoding: 'utf8' },
   )
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean);
-  const devcmd = found[0];
-  if (!devcmd || !existsSync(devcmd)) fail('VsDevCmd.bat not found');
-  return devcmd;
+    .filter(Boolean)[0];
+  if (!install) fail('Visual Studio installation not found');
+  const toolsDir = path.join(install, 'VC', 'Tools', 'MSVC');
+  if (!existsSync(toolsDir)) fail(`MSVC tools not found under ${install}`);
+  const versions = readdirSync(toolsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const newest = versions.at(-1);
+  if (!newest) fail(`no MSVC toolchain under ${toolsDir}`);
+  const bin = path.join(toolsDir, newest, 'bin', 'Hostx64', 'x64');
+  for (const tool of ['dumpbin.exe', 'lib.exe']) {
+    if (!existsSync(path.join(bin, tool))) fail(`${tool} missing in ${bin}`);
+  }
+  return bin;
 }
 
 // dumpbin /exports prints a fixed-width table; each export line is
-// "  ordinal  hint  name". The .def only needs the names.
+// "  ordinal  hint  RVA  name". The .def only needs the names. The table is
+// bounded by blank lines, so tracking blank separation is more reliable than
+// pattern-guessing the section that follows it.
 function parseExports(output: string): string[] {
   const names: string[] = [];
   let inTable = false;
+  let sawName = false;
   for (const line of output.split('\n')) {
-    if (/ordinal\s+name/i.test(line)) {
+    if (/^\s*ordinal\b/i.test(line)) {
       inTable = true;
       continue;
     }
     if (!inTable) continue;
-    // Blank line or a new section header ends the export table.
-    if (line.trim() === '' || /^[A-Za-z ].*$/.test(line) && !/\d/.test(line)) {
-      if (names.length > 0) break;
+    if (line.trim() === '') {
+      // The export table ends at the first blank line after real names.
+      if (sawName) break;
       continue;
     }
-    const m = /^\s+\d+\s+[0-9A-Fa-f]+\s+(\S+)/.exec(line);
-    if (m && m[1]) names.push(m[1]);
+    // Columns are ordinal, hint, RVA, name. The name is the last token and
+    // the only one a .def file needs.
+    const m = /^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+(\S+)/.exec(line);
+    if (m?.[1]) {
+      sawName = true;
+      names.push(m[1]);
+    }
   }
   return [...new Set(names)];
 }
 
+// Runs dumpbin/lib with the MSVC bin directory on PATH. The temp batch file
+// sidesteps cmd.exe's nested-quote escaping.
+function runInMsvcEnv(msvcBin: string, body: string): string {
+  const bat = path.join(os.tmpdir(), `kurippu-mpv-${process.pid}.cmd`);
+  const crlf = (s: string): string => s.split('\n').join('\r\n');
+  writeFileSync(
+    bat,
+    crlf(`@echo off\nset "PATH=${msvcBin};%PATH%"\n${body}\n`),
+  );
+  try {
+    return execFileSync('cmd.exe', ['/c', bat], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } finally {
+    rmSync(bat, { force: true });
+  }
+}
+
 function main(): void {
   if (!existsSync(dll)) fail(`runtime DLL not found: ${dll}`);
-  const devcmd = findDevCmd();
+  const msvcBin = findMsvcBin();
   mkdirSync(outDir, { recursive: true });
 
-  const exportsOut = execFileSync(
-    'cmd.exe',
-    ['/c', `call "${devcmd}" >nul && dumpbin /exports "${dll}"`],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-  );
+  const exportsOut = runInMsvcEnv(msvcBin, `dumpbin /exports "${dll}"`);
   const names = parseExports(exportsOut);
   if (names.length === 0) fail('no exports parsed from the DLL');
   console.log(`found ${names.length} exported symbols`);
@@ -80,19 +122,16 @@ function main(): void {
   const defPath = path.join(outDir, 'mpv.def');
   writeFileSync(
     defPath,
-    [`LIBRARY ${path.basename(dll)}`, 'EXPORTS', ...names].join('\r\n') + '\r\n',
+    // The LIBRARY line names the DLL the import library points at. Without it
+    // link.exe derives the name from the .def file (mpv.def -> mpv.dll), but
+    // the runtime DLL is libmpv-2.dll.
+    [`LIBRARY ${path.basename(dll)}`, 'EXPORTS', ...names].join('\r\n') +
+      '\r\n',
   );
 
   // /machine:x64 pins the target arch; the name must match what binding.gyp
   // links (mpv.lib).
-  execFileSync(
-    'cmd.exe',
-    [
-      '/c',
-      `call "${devcmd}" >nul && lib /def:"${defPath}" /out:"${outFile}" /machine:x64`,
-    ],
-    { encoding: 'utf8', stdio: 'inherit' },
-  );
+  runInMsvcEnv(msvcBin, `lib /def:"${defPath}" /out:"${outFile}" /machine:x64`);
   if (!existsSync(outFile)) fail(`import library was not produced: ${outFile}`);
   console.log(`wrote ${outFile}`);
 }
