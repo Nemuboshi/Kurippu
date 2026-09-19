@@ -1,0 +1,41 @@
+{
+  "name": "kurippu",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "commit": "cz",
+    "prepare": "husky",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "check": "biome check . && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "start": "electron-vite preview"
+  },
+  "packageManager": "pnpm@12.4.2",
+  "license": "GPL-3.0-only",
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@tsconfig/svelte": "^5.0.8",
+    "commitizen": "^4.3.2",
+    "cz-conventional-changelog": "^3.3.0",
+    "electron": "^44.4.2",
+    "electron-vite": "^5.0.0",
+    "husky": "^9.1.7",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  },
+  "pnpm": {},
+  "main": "out/main/index.js"
+}
