@@ -108,7 +108,21 @@ const _vr = $derived.by<VideoRect | null>(() => {
   return letterbox(videoW, videoH, dw, dh, v.width);
 });
 
+// Same end-of-file tolerance Controls uses to disable the mark button.
+const atEnd = $derived(duration > 0 && time >= duration - 0.05);
+
 function togglePlay(): void {
+  // Spec 02 §5.1: resuming while looping outside the fragment seeks back
+  // to the fragment start first, and resuming after the end rewinds.
+  if (!playing) {
+    if (loop && loopCheck(time, mstart, mend) !== null) {
+      backend.seek(mstart ?? 0);
+      time = mstart ?? 0;
+    } else if (atEnd) {
+      backend.seek(0);
+      time = 0;
+    }
+  }
   backend.toggle();
   playing = backend.isPlaying();
 }
