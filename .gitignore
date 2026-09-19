@@ -6,3 +6,4 @@ dist/
 out/
 bin/
 .pi/
+.vitest/
