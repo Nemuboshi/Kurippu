@@ -1,7 +1,10 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, globalShortcut } from 'electron';
+import { registerIpc } from './ipc';
 
 const DEBUG = Boolean(process.env.BORAM_DEBUG);
+
+let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -22,9 +25,14 @@ function createWindow(): void {
   } else {
     win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
   }
+  mainWindow = win;
+  win.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 app.whenReady().then(() => {
+  registerIpc(() => mainWindow);
   if (DEBUG) {
     globalShortcut.register('F12', () => {
       BrowserWindow.getFocusedWindow()?.webContents.toggleDevTools();

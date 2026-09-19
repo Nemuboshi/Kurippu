@@ -181,6 +181,9 @@ importers:
       '@tsconfig/svelte':
         specifier: ^5.0.8
         version: 5.0.8
+      '@types/node':
+        specifier: ^24.13.5
+        version: 24.13.5
       commitizen:
         specifier: ^4.3.2
         version: 4.3.2(@types/node@26.6.1)(typescript@6.0.3)
