@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, globalShortcut, Menu } from 'electron';
-import { createMpvMain } from 'electron-mpv-video/main';
 import { debugEnabled } from './binaries';
 import { registerIpc } from './ipc';
+import { createMpvMain } from './mpv-service';
 
 const DEBUG = debugEnabled();
 let mainWindow: BrowserWindow | null = null;

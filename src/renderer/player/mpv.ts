@@ -1,9 +1,7 @@
-import type {
-  MpvVideoElement,
-  MpvVideoState,
-} from 'electron-mpv-video/renderer';
 import type { MediaInfo } from '../../engine/options';
+import type { MpvVideoState } from '../../shared/mpv-types';
 import type { PlayerBackend } from './backend';
+import type { MpvVideoElement } from './mpv-video';
 import { probeMpvSession } from './probe';
 
 export function createPlayerBackend(): PlayerBackend {

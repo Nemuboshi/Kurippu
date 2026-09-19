@@ -111,7 +111,7 @@ export async function probeMpvSession(
 }
 
 export async function probeMpv(path: string): Promise<MediaInfo> {
-  const session = await window._electronMpvVideo.create({
+  const session = await window._kurippuMpv.create({
     renderMode: 'canvas2d',
     width: 2,
     height: 2,

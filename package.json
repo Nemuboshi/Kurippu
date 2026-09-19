@@ -12,7 +12,9 @@
     "test": "vitest run --passWithNoTests",
     "start": "electron-vite preview",
     "fetch-binaries": "node scripts/fetch-binaries.ts",
-    "build:native": "pnpm --dir node_modules/electron-mpv-video build:native",
+    "libmpv:check": "node --experimental-strip-types scripts/libmpv-runtime.ts check",
+    "libmpv:stage": "node --experimental-strip-types scripts/libmpv-runtime.ts stage",
+    "build:native": "pnpm --dir native/mpv rebuild && pnpm libmpv:stage",
     "package": "pnpm build && electron-builder"
   },
   "packageManager": "pnpm@12.4.2",
@@ -31,6 +33,7 @@
     "electron-vite": "^5.0.0",
     "extract-zip": "2.0.1",
     "husky": "^9.1.7",
+    "node-addon-api": "^8.9.2",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
     "typescript": "~6.0.3",
@@ -44,9 +47,6 @@
   },
   "pnpm": {},
   "main": "out/main/index.js",
-  "dependencies": {
-    "electron-mpv-video": "0.1.1"
-  },
   "build": {
     "appId": "works.earendil.kurippu",
     "productName": "Kurippu",
@@ -58,10 +58,10 @@
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.node",
-      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.dll",
-      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.dylib",
-      "node_modules/electron-mpv-video/native/mpv-addon/build/Release/*.so*"
+      "native/mpv/build/Release/*.node",
+      "native/mpv/build/Release/*.dll",
+      "native/mpv/build/Release/*.dylib",
+      "native/mpv/build/Release/*.so*"
     ],
     "extraResources": [
       {

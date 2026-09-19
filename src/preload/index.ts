@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { exposeMpvApi } from 'electron-mpv-video/preload';
+import { exposeMpvApi } from './mpv-api';
 
 // Renderer-facing API. Everything goes through invoke/handle channels;
 // the renderer never touches Node or Electron directly.
