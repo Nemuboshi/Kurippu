@@ -162,11 +162,12 @@ export class EncoderStore {
     }
   }
 
-  // Mode interlocks: crf rewrites the limit input to "0" and wins over
-  // limit; limit and 2pass require each other.
+  // Mode interlocks: crf and limit are mutually exclusive and both rewrite
+  // the limit input, and 2pass pulls limit on (limit keeps 2pass off).
   setModeCRF(on: boolean): void {
     this.modeCRF = on;
     this.limit = on ? '0' : '';
+    if (on) this.modeLimit = false;
   }
   setModeLimit(on: boolean): void {
     if (on) this.modeCRF = false;
