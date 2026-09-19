@@ -162,22 +162,25 @@ export class EncoderStore {
     }
   }
 
-  // Mode interlocks: crf and limit are mutually exclusive and both rewrite
-  // the limit input, and 2pass pulls limit on (limit keeps 2pass off).
+  // Mode interlocks (spec 03 §2): crf and limit are mutually exclusive, and
+  // either toggle rewrites the limit input to "0" under crf or "" otherwise,
+  // so a stale "0" never leaks into limit-mode bitrate math.
   setModeCRF(on: boolean): void {
     this.modeCRF = on;
-    this.limit = on ? '0' : '';
     if (on) this.modeLimit = false;
+    this.limit = this.modeCRF ? '0' : '';
   }
   setModeLimit(on: boolean): void {
-    if (on) this.modeCRF = false;
     this.modeLimit = on;
-    if (on) this.mode2Pass = true;
-    else this.mode2Pass = false;
+    if (on) this.modeCRF = false;
+    this.limit = this.modeCRF ? '0' : '';
+    this.mode2Pass = on;
   }
   setMode2Pass(on: boolean): void {
     this.mode2Pass = on;
-    if (on) this.modeLimit = true;
+    // 2pass targets a size, so it pulls limit on; crf has no target size and
+    // must stay exclusive with limit.
+    if (on && !this.modeCRF) this.modeLimit = true;
   }
 
   // External subtitle pick auto-checks burn and switches the select to the
