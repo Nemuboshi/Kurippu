@@ -66,6 +66,15 @@ async function startResolve(): Promise<void> {
     sid = defaultSubtitle(info);
   } catch {
     error = 'could not parse yt-dlp output';
+    return;
+  }
+  // Debug override: skip the format picker and download a fixed format.
+  const { format } = await api.debugSettings();
+  if (format) {
+    vfid = format;
+    afid = 'none';
+    sid = 'none';
+    void startDownload();
   }
 }
 
