@@ -19,6 +19,8 @@ interface Props {
   onMarkEnd?: (seconds: number) => void;
   crop?: CropRect | null;
   disabled?: boolean;
+  // yadif deinterlace toggle; kept in sync with the libmpv video chain.
+  deinterlace?: boolean;
 }
 const {
   src,
@@ -29,6 +31,7 @@ const {
   onMarkEnd,
   crop = null,
   disabled = false,
+  deinterlace = false,
 }: Props = $props();
 
 const backend: PlayerBackend = createPlayerBackend();
@@ -67,6 +70,12 @@ $effect(() => {
     ro.disconnect();
     backend.detach();
   };
+});
+
+// Toggles yadif on the libmpv video chain whenever the store flag changes.
+$effect(() => {
+  if (!src) return;
+  backend.setDeinterlace(deinterlace);
 });
 
 // Loads the source and wires backend time into local state.

@@ -86,7 +86,7 @@ $effect(() => {
 
 <div class="encoder" bind:this={encoderEl}>
   <button class="change" disabled={encoding.current} onclick={onChangeSource}>open another source</button>
-  <div class="player-pane"><Player src={source.path} {crop} disabled={encoding.current} {onCrop} onProbe={onProbe} onTime={(t) => { currentTime = t; }} onMarkStart={(t) => store.markStart(t)} onMarkEnd={(t) => store.markEnd(t)} /></div>
+  <div class="player-pane"><Player src={source.path} {crop} disabled={encoding.current} deinterlace={store.deinterlace} {onCrop} onProbe={onProbe} onTime={(t) => { currentTime = t; }} onMarkStart={(t) => store.markStart(t)} onMarkEnd={(t) => store.markEnd(t)} /></div>
   <div class="divider" class:dragging role="separator" aria-orientation="horizontal" aria-label="Resize player and panels" onpointerdown={startDrag}></div>
   <div class="tabs-pane" style="height:{tabsHeight}px"><SubTabs {store} disabled={encoding.current}>
     {#snippet info()}<dl class="info">

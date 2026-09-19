@@ -488,6 +488,11 @@ export class MpvVideoElement extends HTMLElement {
     return this.player?.getProperty(name);
   }
 
+  async setDeinterlace(on: boolean) {
+    await this.ensureReady();
+    await this.player?.setDeinterlace(on);
+  }
+
   async setVolume(value: number) {
     await this.ensureReady();
     const volume = Number.isFinite(value)

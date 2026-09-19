@@ -61,6 +61,9 @@ class MpvBackend implements PlayerBackend {
   setMuted(muted: boolean): void {
     void this.element?.setVolume(muted ? 0 : this.volume);
   }
+  setDeinterlace(on: boolean): void {
+    void this.element?.setDeinterlace(on);
+  }
   onTime(cb: (seconds: number) => void): () => void {
     this.listeners.add(cb);
     return () => this.listeners.delete(cb);

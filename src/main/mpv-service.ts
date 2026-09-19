@@ -14,6 +14,7 @@ const IPC_CHANNELS = [
   'player:stop',
   'player:seek',
   'player:set-volume',
+  'player:set-deinterlace',
   'player:get-property',
   'player:set-render-size',
   'player:set-render-pipeline',
@@ -41,6 +42,8 @@ type NativePlayer = {
   stop(): void;
   seek(seconds: number): void;
   setVolume(value: number): void;
+  getProperty(name: string): Promise<unknown>;
+  setDeinterlace(on: boolean): void;
   setUpdateCallback(callback?: () => void): void;
   setEventCallback(callback?: () => void): void;
   renderFrame(width: number, height: number): NativeFrame;
@@ -243,6 +246,11 @@ class PlayerSession {
   getProperty(name: string): Promise<unknown> {
     this.assertAlive();
     return this.player.getProperty(name);
+  }
+
+  setDeinterlace(on: boolean) {
+    this.assertAlive();
+    this.player.setDeinterlace(on);
   }
 
   setRenderSize(size: RenderSize) {
@@ -659,6 +667,11 @@ class MpvMainService implements MpvMain {
       channel('player:get-property'),
       async (event, id, name) =>
         this.getOwnedSession(event, id).getProperty(String(name)),
+    );
+    electron.ipcMain.handle(
+      channel('player:set-deinterlace'),
+      async (event, id, on) =>
+        this.getOwnedSession(event, id).setDeinterlace(on === true),
     );
     electron.ipcMain.handle(
       channel('player:set-render-size'),

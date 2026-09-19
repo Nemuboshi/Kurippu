@@ -132,6 +132,8 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
       InstanceMethod("stop", &MpvPlayer::Stop),
       InstanceMethod("seek", &MpvPlayer::Seek),
       InstanceMethod("setVolume", &MpvPlayer::SetVolume),
+      InstanceMethod("getProperty", &MpvPlayer::GetProperty),
+      InstanceMethod("setDeinterlace", &MpvPlayer::SetDeinterlace),
       InstanceMethod("setUpdateCallback", &MpvPlayer::SetUpdateCallback),
       InstanceMethod("setEventCallback", &MpvPlayer::SetEventCallback),
       InstanceMethod("renderFrame", &MpvPlayer::RenderFrame),
@@ -356,6 +358,53 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
     double volume = std::clamp(info[0].As<Napi::Number>().DoubleValue(), 0.0, 100.0);
     int ret = mpv_set_property(handle_, "volume", MPV_FORMAT_DOUBLE, &volume);
     if (ret < 0) throw_mpv_error(env, "setVolume", ret);
+    return env.Undefined();
+  }
+
+  Napi::Value GetProperty(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsString()) {
+      Napi::TypeError::New(env, "getProperty(name) requires a string name").ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    std::string name = info[0].As<Napi::String>().Utf8Value();
+
+    // String properties cover the probe path (duration is double, track-list
+    // and metadata are node, but node reads back as strings for our fields).
+    char* str_value = mpv_get_property_string(handle_, name.c_str());
+    if (str_value) {
+      Napi::String result = Napi::String::New(env, str_value);
+      mpv_free(str_value);
+      return result;
+    }
+
+    // Fall back to the numeric and flag formats used by duration and friends.
+    double num_value = 0;
+    if (mpv_get_property(handle_, name.c_str(), MPV_FORMAT_DOUBLE, &num_value) >= 0) {
+      return Napi::Number::New(env, num_value);
+    }
+    int flag_value = 0;
+    if (mpv_get_property(handle_, name.c_str(), MPV_FORMAT_FLAG, &flag_value) >= 0) {
+      return Napi::Boolean::New(env, flag_value != 0);
+    }
+    return env.Null();
+  }
+
+  Napi::Value SetDeinterlace(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsBoolean()) {
+      Napi::TypeError::New(env, "setDeinterlace(on) requires a boolean").ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    // Remove first so repeated enables never stack a second yadif.
+    int removed = command({"vf-remove", "yadif"});
+    if (info[0].As<Napi::Boolean>().Value()) {
+      int added = command({"vf-add", "yadif"});
+      if (added < 0) throw_mpv_error(env, "vf-add", added);
+    } else if (removed < 0 && removed != MPV_ERROR_PROPERTY_UNSET) {
+      // An unset property just means no filter was ever installed.
+      throw_mpv_error(env, "vf-remove", removed);
+    }
     return env.Undefined();
   }
 

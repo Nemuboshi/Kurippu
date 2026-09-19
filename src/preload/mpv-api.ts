@@ -70,6 +70,8 @@ function createPlayerSession(id: string): MpvPlayerSession {
       electron.ipcRenderer.invoke(channel('player:set-volume'), id, value),
     getProperty: (name: string) =>
       electron.ipcRenderer.invoke(channel('player:get-property'), id, name),
+    setDeinterlace: (on: boolean) =>
+      electron.ipcRenderer.invoke(channel('player:set-deinterlace'), id, on),
     setRenderSize: (width: number, height: number) =>
       electron.ipcRenderer.invoke(channel('player:set-render-size'), id, {
         width,

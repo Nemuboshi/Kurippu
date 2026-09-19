@@ -16,6 +16,8 @@ export interface PlayerBackend {
   // volume: 0-100.
   setVolume(volume: number): void;
   setMuted(muted: boolean): void;
+  // Toggles yadif deinterlacing on the libmpv video chain.
+  setDeinterlace(on: boolean): void;
   // Registers a time observer. Returns an unsubscribe function.
   onTime(cb: (seconds: number) => void): () => void;
   getTime(): number;

@@ -33,6 +33,7 @@ export type MpvPlayerSession = {
   seek(seconds: number): Promise<void>;
   setVolume(value: number): Promise<void>;
   getProperty(name: string): Promise<unknown>;
+  setDeinterlace(on: boolean): Promise<void>;
   setRenderSize(width: number, height: number): Promise<void>;
   setRenderMode(mode: RenderMode): Promise<void>;
   destroy(): Promise<void>;
