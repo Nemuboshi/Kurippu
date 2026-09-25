@@ -31,6 +31,7 @@ pub mod format {
         mpv_format_MPV_FORMAT_DOUBLE as MPV_FORMAT_DOUBLE,
         mpv_format_MPV_FORMAT_FLAG as MPV_FORMAT_FLAG,
         mpv_format_MPV_FORMAT_INT64 as MPV_FORMAT_INT64,
+        mpv_format_MPV_FORMAT_NODE as MPV_FORMAT_NODE,
         mpv_format_MPV_FORMAT_NODE_ARRAY as MPV_FORMAT_NODE_ARRAY,
         mpv_format_MPV_FORMAT_NODE_MAP as MPV_FORMAT_NODE_MAP,
         mpv_format_MPV_FORMAT_NONE as MPV_FORMAT_NONE,
@@ -75,6 +76,23 @@ pub const API_TYPE_SW: &str = "sw";
 /// mpv's SW renderer converts to the caller's buffer; the C++ addon requested
 /// and documented "rgba", so the port must keep asking for exactly that.
 pub const SW_FORMAT_RGBA: &str = "rgba";
+
+/// `mpv_error_string` as a Rust string, preserving `mpv_error_text`'s two
+/// special cases (`mpv_addon.cc:72-76`): non-negative codes are "ok", and a
+/// null pointer from the library reads "unknown mpv error".
+pub fn error_text(code: std::os::raw::c_int) -> String {
+    if code >= 0 {
+        return String::from("ok");
+    }
+    let raw = unsafe { mpv_error_string(code) };
+    if raw.is_null() {
+        String::from("unknown mpv error")
+    } else {
+        unsafe { std::ffi::CStr::from_ptr(raw) }
+            .to_string_lossy()
+            .into_owned()
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,8 @@
 #![allow(clippy::unused_unit)]
 mod callbacks;
 mod ffi;
+mod player;
+mod render;
 mod scale;
 mod value;
 
