@@ -58,7 +58,12 @@ jobs:
           if (-not $mpvInclude) { throw 'The libmpv SDK did not contain mpv headers' }
           Copy-Item (Join-Path $mpvInclude.Parent.FullName '*') (Join-Path $sdk 'include') -Recurse -Force
           Get-ChildItem -Path $runtimeDir -Recurse -File -Filter '*.dll' | Copy-Item -Destination (Join-Path $sdk 'bin') -Force
-          pnpm libmpv:importlib
+          # Invoke node directly, not `pnpm libmpv:importlib`. pnpm sees no
+          # node_modules this early and auto-installs first, which fires the
+          # native/mpv gypfile hook -- and that node-gyp build needs the mpv.lib
+          # this script exists to produce. The package manager demands the
+          # artifact its own pre-step generates.
+          node --experimental-strip-types scripts/libmpv-importlib.ts
       - name: Install macOS libmpv
         if: runner.os == 'macOS'
         run: brew install mpv
