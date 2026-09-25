@@ -193,34 +193,27 @@ impl MpvPlayer {
 
     fn init_render_context(&mut self) -> Result<()> {
         if self.mode == "shared-texture" {
-            let handle = self.handle()?;
-            #[cfg(target_os = "macos")]
-            let target = crate::render::macos::MacSharedTarget::new(handle).map(Some)?;
-            #[cfg(target_os = "windows")]
-            let target = crate::render::windows::WinSharedTarget::new(handle).map(Some)?;
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            let target = {
-                let _ = handle;
-                None::<()>
-            };
+            return Err(Error::new(
+                Status::GenericFailure,
+                "shared-texture mode is only implemented on macOS and Windows",
+            ));
 
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
-                let ctx = target.as_ref().expect("constructed").render_ctx();
+                let handle = self.handle()?;
+                #[cfg(target_os = "macos")]
+                let target = crate::render::macos::MacSharedTarget::new(handle)?;
+                #[cfg(target_os = "windows")]
+                let target = crate::render::windows::WinSharedTarget::new(handle)?;
+
+                let ctx = target.render_ctx();
                 self.render_ctx = Some(RenderCtx(ctx));
-                self.shared = target;
+                self.shared = Some(target);
                 if let Some(hub) = self.hub.as_ref() {
                     hub.install_render_update(ctx);
                 }
                 return Ok(());
-            }
-            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            {
-                drop(target);
-                return Err(Error::new(
-                    Status::GenericFailure,
-                    "shared-texture mode is only implemented on macOS and Windows",
-                ));
             }
         }
 
