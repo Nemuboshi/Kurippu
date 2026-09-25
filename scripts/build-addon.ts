@@ -22,7 +22,10 @@ function sourceName(): string {
 }
 
 function main(): void {
-  execFileSync('cargo', ['build', '--release'], { cwd: crateDir, stdio: 'inherit' });
+  execFileSync('cargo', ['build', '--release'], {
+    cwd: crateDir,
+    stdio: 'inherit',
+  });
   const source = path.join(crateDir, 'target', 'release', sourceName());
   const destination = path.join(outDir, 'mpv_addon.node');
   mkdirSync(outDir, { recursive: true });

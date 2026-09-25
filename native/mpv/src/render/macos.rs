@@ -247,25 +247,21 @@ impl MacSharedTarget {
             unsafe { CFRelease(number) };
         };
 
-        let bytes_per_row = unsafe {
-            IOSurfaceAlignProperty(&raw const kIOSurfaceBytesPerRow, (width * 4) as usize)
-        } as i32;
+        let bytes_per_row =
+            unsafe { IOSurfaceAlignProperty(kIOSurfaceBytesPerRow, (width * 4) as usize) } as i32;
         let alloc_size = unsafe {
             IOSurfaceAlignProperty(
-                &raw const kIOSurfaceAllocSize,
+                kIOSurfaceAllocSize,
                 (bytes_per_row as usize) * height as usize,
             )
         } as i32;
 
-        set_number(&raw const kIOSurfaceWidth, width);
-        set_number(&raw const kIOSurfaceHeight, height);
-        set_number(&raw const kIOSurfaceBytesPerElement, 4);
-        set_number(&raw const kIOSurfaceBytesPerRow, bytes_per_row);
-        set_number(&raw const kIOSurfaceAllocSize, alloc_size);
-        set_number(
-            &raw const kIOSurfacePixelFormat,
-            fourcc(b'B', b'G', b'R', b'A'),
-        );
+        set_number(kIOSurfaceWidth, width);
+        set_number(kIOSurfaceHeight, height);
+        set_number(kIOSurfaceBytesPerElement, 4);
+        set_number(kIOSurfaceBytesPerRow, bytes_per_row);
+        set_number(kIOSurfaceAllocSize, alloc_size);
+        set_number(kIOSurfacePixelFormat, fourcc(b'B', b'G', b'R', b'A'));
 
         let surface = unsafe { IOSurfaceCreate(props) };
         unsafe { CFRelease(props) };
@@ -332,13 +328,13 @@ impl MacSharedTarget {
         Ok(())
     }
 
-    pub fn render(
+    pub fn render<'env>(
         &mut self,
-        env: &Env,
+        env: &'env Env,
         width: i32,
         height: i32,
         timestamp: u64,
-    ) -> Result<Object<'_>> {
+    ) -> Result<Object<'env>> {
         self.ensure_target(width, height)?;
         unsafe { cgl::CGLSetCurrentContext(self.gl_ctx) };
 

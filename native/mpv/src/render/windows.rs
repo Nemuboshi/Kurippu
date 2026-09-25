@@ -639,13 +639,13 @@ impl WinSharedTarget {
         Ok(())
     }
 
-    pub fn render(
+    pub fn render<'env>(
         &mut self,
-        env: &Env,
+        env: &'env Env,
         width: c_int,
         height: c_int,
         timestamp: u64,
-    ) -> Result<Object<'_>> {
+    ) -> Result<Object<'env>> {
         self.ensure_target(width, height)?;
         self.make_current()?;
 

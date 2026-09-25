@@ -165,6 +165,8 @@ impl MpvPlayer {
             handle: Some(handle),
             hub: Some(hub),
             software: None,
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            shared: None,
             mode,
             deinterlace: false,
             timestamp: 0,
