@@ -14,8 +14,10 @@
     "fetch-binaries": "node scripts/fetch-binaries.ts",
     "libmpv:check": "node --experimental-strip-types scripts/libmpv-runtime.ts check",
     "libmpv:stage": "node --experimental-strip-types scripts/libmpv-runtime.ts stage",
+    "libmpv:importlib": "node --experimental-strip-types scripts/libmpv-importlib.ts",
     "build:native": "node-gyp rebuild --dir=native/mpv && pnpm libmpv:stage",
-    "package": "pnpm build && electron-builder"
+    "runtime:check": "node --experimental-strip-types scripts/check-runtime.ts",
+    "package": "pnpm build && pnpm runtime:check && electron-builder"
   },
   "packageManager": "pnpm@12.4.2",
   "license": "GPL-3.0-only",
@@ -57,13 +59,17 @@
       "out/**/*",
       "package.json"
     ],
-    "asarUnpack": [
-      "native/mpv/build/Release/*.node",
-      "native/mpv/build/Release/*.dll",
-      "native/mpv/build/Release/*.dylib",
-      "native/mpv/build/Release/*.so*"
-    ],
     "extraResources": [
+      {
+        "from": "native/mpv/build/Release",
+        "to": "native/mpv",
+        "filter": [
+          "mpv_addon.node",
+          "*.dll",
+          "*.dylib",
+          "*.so*"
+        ]
+      },
       {
         "from": "bin/${os}-${arch}",
         "to": ".",

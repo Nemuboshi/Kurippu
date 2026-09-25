@@ -51,7 +51,8 @@ describe('crop rect conversion', () => {
     const crop = { w: 640, h: 360, x: 100, y: 50 };
     const css = videoToContainer(crop, vr, 0);
     expect(css).not.toBeNull();
-    const back = containerToVideo(css!, vr, 1920, 1080);
+    if (!css) throw new Error('crop conversion returned no rectangle');
+    const back = containerToVideo(css, vr, 1920, 1080);
     expect(back).toEqual(crop);
   });
   it('applies the inset on container conversion', () => {

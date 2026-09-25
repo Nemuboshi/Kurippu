@@ -12,8 +12,11 @@ const validation = $derived.by(() => store.derived);
 
 // x264 output is mp4, which only carries aac/ac3/mp3; webm carries
 // opus/vorbis. copy needs a source track in a copyable codec.
-const audioCodecs: readonly string[] =
-  store.vcodec === 'x264' ? ['aac', 'copy'] : ['opus', 'vorbis', 'aac', 'copy'];
+const audioCodecs = $derived<readonly string[]>(
+  store.vcodec === 'x264'
+    ? ['aac', 'copy']
+    : ['opus', 'vorbis', 'aac', 'copy'],
+);
 
 // Fall back to a valid codec when a vcodec switch makes the current acodec
 // impossible (x264 loses opus/vorbis; a non-copyable track loses copy).

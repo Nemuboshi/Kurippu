@@ -85,6 +85,7 @@ export interface OptionInputs {
 }
 
 export interface TrackInfo {
+  id?: number;
   codec: string;
   width?: number;
   height?: number;
@@ -95,6 +96,38 @@ export interface TrackInfo {
   sampleRate?: number;
   bitrate?: number;
   profile?: string;
+  selected?: boolean;
+  title?: string;
+}
+
+// These codecs contain text that the subtitles filter can render. Unknown
+// codecs are treated as image tracks and use the overlay filter instead.
+const TEXT_SUBTITLE_CODECS = new Set([
+  'ass',
+  'eia_608',
+  'eia_708',
+  'jacosub',
+  'microdvd',
+  'mov_text',
+  'mpl2',
+  'pjs',
+  'realtext',
+  'sami',
+  'scc',
+  'ssa',
+  'stl',
+  'subrip',
+  'subviewer',
+  'subviewer1',
+  'text',
+  'tedcaptions',
+  'ttml',
+  'vplayer',
+  'webvtt',
+]);
+
+export function isTextSubtitleCodec(codec: string): boolean {
+  return TEXT_SUBTITLE_CODECS.has(codec.trim().toLowerCase());
 }
 
 export interface MediaInfo {
@@ -200,6 +233,20 @@ export function deriveOptions(
     } catch {
       codecsErrors.push({ field: 'start', message: 'invalid time' });
     }
+  }
+
+  let graphicSubs = false;
+  if (input.burnSubs && input.subpath.trim() === '') {
+    const subtitleIndex = Number.parseInt(input.strack, 10);
+    const subtitle = Number.isInteger(subtitleIndex)
+      ? media.stracks[subtitleIndex]
+      : undefined;
+    if (!subtitle) {
+      errors.video.push({
+        field: 'strack',
+        message: 'select an embedded subtitle track',
+      });
+    } else graphicSubs = !isTextSubtitleCodec(subtitle.codec);
   }
   if (endRaw !== '') {
     try {
@@ -449,6 +496,7 @@ export function deriveOptions(
         fixSAR: input.fixSAR,
         anamorph,
         burnSubs: input.burnSubs,
+        graphicSubs,
         subpath: emptyToNull(input.subpath.trim()),
         strackn: input.strack === '' ? null : Number.parseInt(input.strack, 10),
         speed: null,

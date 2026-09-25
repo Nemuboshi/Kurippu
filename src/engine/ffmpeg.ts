@@ -32,6 +32,7 @@ export interface RawArgsInput {
   fixSAR: boolean;
   anamorph: boolean;
   burnSubs: boolean;
+  graphicSubs: boolean;
   subpath: string | null; // external subtitle file; null uses the source path
   strackn: number | null; // embedded subtitle stream index
   speed: number | null;
@@ -89,7 +90,7 @@ function videoCodecArgs(input: RawArgsInput): string[] {
   return args;
 }
 
-function videoFilters(input: RawArgsInput): string[] {
+function transformVideoFilters(input: RawArgsInput): string[] {
   const filters: string[] = [];
   const { crop } = input;
   if (input.deinterlace) filters.push('yadif');
@@ -102,7 +103,12 @@ function videoFilters(input: RawArgsInput): string[] {
     filters.push(`scale=${input.finalWidth}:${input.finalHeight}`);
     if (input.fixSAR || !input.anamorph) filters.push('setsar=1');
   }
-  if (input.burnSubs) {
+  return filters;
+}
+
+function videoFilters(input: RawArgsInput): string[] {
+  const filters = transformVideoFilters(input);
+  if (input.burnSubs && !input.graphicSubs) {
     const subpath = input.subpath ?? input.inpath;
     let sub = `subtitles=${escapeFilterPath(fileArg(subpath))}`;
     if (input.strackn != null && input.subpath == null)
@@ -117,6 +123,13 @@ function videoFilters(input: RawArgsInput): string[] {
   }
   if (input.speed != null) filters.push(`setpts=PTS*${input.speed}`);
   return filters;
+}
+
+function graphicSubtitleFilter(input: RawArgsInput): string {
+  const filters = transformVideoFilters(input);
+  if (input.speed != null) filters.push(`setpts=PTS*${input.speed}`);
+  const transforms = filters.length > 0 ? `,${filters.join(',')}` : '';
+  return `[0:v:${input.vtrackn}][0:s:${input.strackn}]overlay${transforms}[v]`;
 }
 
 function audioArgs(input: RawArgsInput): string[] {
@@ -147,7 +160,8 @@ function audioArgs(input: RawArgsInput): string[] {
 }
 
 // Builds the raw ffmpeg argument list in fixed order. Returns one string with
-// shell-escaped -i and -vf values, ready to show and edit in the UI.
+// shell-escaped -i and -vf/-filter_complex values, ready to show and edit in
+// the UI.
 export function getRawArgs(input: RawArgsInput): string {
   const args: (string | string[])[] = [];
 
@@ -157,7 +171,18 @@ export function getRawArgs(input: RawArgsInput): string {
     args.push('-ss', '0');
   if (input.end != null) args.push('-t', ceilFixed(input.duration, 3));
 
-  args.push('-map', `0:v:${input.vtrackn}`);
+  const graphicSubs =
+    input.burnSubs && input.graphicSubs && input.strackn != null;
+  if (graphicSubs) {
+    args.push(
+      '-filter_complex',
+      escapeArg(graphicSubtitleFilter(input)),
+      '-map',
+      '[v]',
+    );
+  } else {
+    args.push('-map', `0:v:${input.vtrackn}`);
+  }
   if (input.hasAudio) args.push('-map', `0:a:${input.atrackn}`);
 
   args.push('-threads', String(input.threads));
@@ -174,8 +199,10 @@ export function getRawArgs(input: RawArgsInput): string {
     args.push('-auto-alt-ref', '1', '-lag-in-frames', '25', '-g', '128');
   args.push('-pix_fmt', 'yuv420p');
 
-  const vf = videoFilters(input);
-  if (vf.length > 0) args.push('-vf', escapeArg(vf.join(',')));
+  if (!graphicSubs) {
+    const vf = videoFilters(input);
+    if (vf.length > 0) args.push('-vf', escapeArg(vf.join(',')));
+  }
 
   args.push(audioArgs(input));
 
@@ -318,6 +345,16 @@ export function getTestArgs(rawArgs: string, tmppath: string): string[] {
   const extra = 'scale=floor((iw+1)/2)*2:-2';
   if (vfIdx >= 0) {
     args[vfIdx + 1] = `${args[vfIdx + 1]},${extra}`;
+  } else if (args.includes('-filter_complex')) {
+    const graphIdx = args.indexOf('-filter_complex') + 1;
+    const graph = args[graphIdx] ?? '';
+    const outputLabel = graph.match(/(\[[^\]]+\])$/)?.[1];
+    if (outputLabel) {
+      args[graphIdx] =
+        `${graph.slice(0, -outputLabel.length)},${extra}${outputLabel}`;
+    } else {
+      args.push('-vf', extra);
+    }
   } else {
     args.push('-vf', extra);
   }

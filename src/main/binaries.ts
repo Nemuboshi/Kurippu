@@ -1,13 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
-
-const legacyPrefix = `${'BO'}${'RAM'}_`;
+import { join } from 'node:path';
 
 function env(name: string): string | undefined {
-  return (
-    process.env[`KURIPPU_${name}`] ?? process.env[`${legacyPrefix}${name}`]
-  );
+  return process.env[`KURIPPU_${name}`];
 }
 
 function which(bin: string): string | null {
@@ -32,8 +28,6 @@ function bundledPath(name: string): string | null {
 export function resolveFfmpeg(): string | null {
   const override = env('FFMPEG');
   if (override && existsSync(override)) return override;
-  if (process.platform === 'linux')
-    return bundledPath('ffmpeg') ?? which('ffmpeg');
   return bundledPath('ffmpeg') ?? which('ffmpeg');
 }
 
@@ -44,13 +38,18 @@ export function resolveYtDlp(): string | null {
 }
 
 export function debugEnabled(): boolean {
-  return Boolean(env('DEBUG'));
+  return envFlag('DEBUG');
+}
+
+export function noHardwareAcceleration(): boolean {
+  return envFlag('NO_HWACCEL');
+}
+
+function envFlag(name: string): boolean {
+  const value = env(name)?.trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes';
 }
 
 export function debugValue(name: 'TAB' | 'FORMAT'): string | undefined {
   return env(`DEBUG_${name}`);
-}
-
-export function pathDirs(): string[] {
-  return (process.env.PATH ?? '').split(delimiter).filter(Boolean);
 }

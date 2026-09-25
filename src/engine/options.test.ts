@@ -209,4 +209,34 @@ describe('deriveOptions', () => {
     const fixed = deriveOptions(baseInput({ fixSAR: true }), anamorphic, 8);
     expect(fixed.warnings.video).toHaveLength(0);
   });
+
+  it('uses overlay for image subtitles in burned subtitle output', () => {
+    const imageSubs: MediaInfo = {
+      ...media,
+      stracks: [{ codec: 'hdmv_pgs_subtitle', lang: 'jpn' }],
+    };
+    const result = deriveOptions(
+      baseInput({ burnSubs: true, strack: '0' }),
+      imageSubs,
+      8,
+    );
+    expect(result.allValid).toBe(true);
+    expect(result.values?.strackn).toBe(0);
+    expect(result.values?.graphicSubs).toBe(true);
+  });
+
+  it('allows text subtitles for burned subtitle output', () => {
+    const textSubs: MediaInfo = {
+      ...media,
+      stracks: [{ codec: 'subrip', lang: 'eng' }],
+    };
+    const result = deriveOptions(
+      baseInput({ burnSubs: true, strack: '0' }),
+      textSubs,
+      8,
+    );
+    expect(result.allValid).toBe(true);
+    expect(result.values?.strackn).toBe(0);
+    expect(result.values?.graphicSubs).toBe(false);
+  });
 });

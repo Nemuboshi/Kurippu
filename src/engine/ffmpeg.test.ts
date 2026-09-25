@@ -38,6 +38,7 @@ const base: RawArgsInput = {
   fixSAR: false,
   anamorph: false,
   burnSubs: false,
+  graphicSubs: false,
   subpath: null,
   strackn: null,
   speed: null,
@@ -122,6 +123,21 @@ describe('getRawArgs', () => {
   it('embedded subs use source path with si index', () => {
     const raw = getRawArgs({ ...base, burnSubs: true, strackn: 1 });
     expect(raw).toContain('si=1');
+  });
+
+  it('burns graphical embedded subtitles with overlay', () => {
+    const raw = getRawArgs({
+      ...base,
+      burnSubs: true,
+      graphicSubs: true,
+      strackn: 1,
+    });
+    const args = parseArgs(raw);
+    const graph = args[args.indexOf('-filter_complex') + 1] ?? '';
+    expect(graph).toBe('[0:v:0][0:s:1]overlay[v]');
+    expect(args).toContain('[v]');
+    expect(args).not.toContain('-vf');
+    expect(raw).not.toContain('subtitles=');
   });
 
   it('deinterlace is the first filter', () => {
@@ -225,6 +241,19 @@ describe('getTestArgs', () => {
     const args = getTestArgs(raw, '/tmp/test.mkv');
     const vf = args[args.indexOf('-vf') + 1] ?? '';
     expect(vf).toContain('scale=floor((iw+1)/2)*2:-2');
+  });
+
+  it('appends even-width scale inside a graphical subtitle graph', () => {
+    const raw = getRawArgs({
+      ...base,
+      burnSubs: true,
+      graphicSubs: true,
+      strackn: 1,
+    });
+    const args = getTestArgs(raw, '/tmp/test.mkv');
+    const graph = args[args.indexOf('-filter_complex') + 1] ?? '';
+    expect(graph).toContain('overlay,scale=floor((iw+1)/2)*2:-2[v]');
+    expect(args).not.toContain('-vf');
   });
 });
 

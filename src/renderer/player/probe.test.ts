@@ -6,15 +6,32 @@ describe('mediaInfoFromMpv', () => {
     expect(
       mediaInfoFromMpv('clip.mkv', 12.5, [
         {
+          id: 1,
           type: 'video',
           codec: 'h264',
           'demux-w': 1920,
           'demux-h': 1080,
           'demux-par': 1.25,
+          'demux-fps': 23.976,
           'container-fps': 29.97,
+          selected: true,
         },
-        { type: 'audio', codec: 'aac', 'demux-channel-count': 6, lang: 'en' },
-        { type: 'sub', codec: 'ass', lang: 'ja' },
+        {
+          id: 2,
+          type: 'audio',
+          codec: 'aac',
+          'demux-channel-count': 6,
+          lang: 'en',
+          selected: true,
+        },
+        {
+          id: 3,
+          type: 'sub',
+          codec: 'ass',
+          lang: 'ja',
+          title: 'Japanese',
+          selected: false,
+        },
       ]),
     ).toEqual({
       path: 'clip.mkv',
@@ -24,17 +41,20 @@ describe('mediaInfoFromMpv', () => {
       sar: 1.25,
       vtracks: [
         {
+          id: 1,
           codec: 'h264',
           width: 1920,
           height: 1080,
           sar: 1.25,
-          fps: 29.97,
+          fps: 23.976,
           lang: undefined,
           channels: undefined,
+          selected: true,
         },
       ],
       atracks: [
         {
+          id: 2,
           codec: 'aac',
           width: undefined,
           height: undefined,
@@ -42,10 +62,12 @@ describe('mediaInfoFromMpv', () => {
           fps: undefined,
           lang: 'en',
           channels: 6,
+          selected: true,
         },
       ],
       stracks: [
         {
+          id: 3,
           codec: 'ass',
           width: undefined,
           height: undefined,
@@ -53,6 +75,8 @@ describe('mediaInfoFromMpv', () => {
           fps: undefined,
           lang: 'ja',
           channels: undefined,
+          selected: false,
+          title: 'Japanese',
         },
       ],
     });

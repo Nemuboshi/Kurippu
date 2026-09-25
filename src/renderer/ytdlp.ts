@@ -14,7 +14,7 @@ function fmtSize(bytes: number | undefined): string {
 
 function vcodecLabel(
   v: string | undefined,
-  height: number | undefined,
+  _height: number | undefined,
 ): string {
   if (!v || v === 'none') return '';
   const base = v.replace(/\..*$/, '');
@@ -101,7 +101,7 @@ export function downloadArgs(
   vfid: string,
   afid: string,
   sid: string,
-  sext: string,
+  _sext: string,
   outpath: string,
   ffmpegPath: string | null,
 ): string[] {
@@ -114,8 +114,7 @@ export function downloadArgs(
     '--merge-output-format',
     'mkv',
   ];
-  if (process.platform === 'darwin' && ffmpegPath)
-    args.push('--ffmpeg-location', ffmpegPath);
+  if (ffmpegPath) args.push('--ffmpeg-location', ffmpegPath);
   if (sid !== 'none') {
     args.push(
       '--sub-langs',

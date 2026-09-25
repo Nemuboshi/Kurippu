@@ -33,6 +33,7 @@ export interface EncodeEvents {
 }
 export const encoding: { current: boolean } = $state({ current: false });
 let procId: number | null = null;
+let cancelRequested = false;
 let offLog: (() => void) | null = null;
 let offStart: (() => void) | null = null;
 let savedTitle = '';
@@ -59,14 +60,14 @@ interface RunResult {
   signal: string | null;
 }
 async function runPass(
-  bin: string,
   args: string[],
   events: EncodeEvents,
 ): Promise<RunResult> {
   events.log(`$ ffmpeg ${args.join(' ')}`);
-  return window.kurippu.runProcess(bin, args);
+  return window.kurippu.runProcess('ffmpeg', args);
 }
 export async function cancelEncode(): Promise<void> {
+  cancelRequested = true;
   if (procId != null) await window.kurippu.killProcess(procId);
 }
 export async function openOutput(path: string): Promise<void> {
@@ -93,7 +94,6 @@ async function logStats(
   e.log(`Elapsed: ${Math.round(elapsed / 1000)} s`);
 }
 async function encodeMain(
-  bin: string,
   req: EncodeRequest,
   path: string,
   passlog: string,
@@ -107,24 +107,27 @@ async function encodeMain(
     passlog,
   };
   if (req.twoPass) {
+    if (cancelRequested) return false;
     prog.pass = 1;
-    const a = await runPass(bin, getEncodeArgs(input, 1), e);
+    const a = await runPass(getEncodeArgs(input, 1), e);
     if (a.code !== 0) {
       e.log(describeExit(a.code, a.signal));
       return false;
     }
+    if (cancelRequested) return false;
     prog.pass = 2;
     prog.lastFrame = 0;
-    const b = await runPass(bin, getEncodeArgs(input, 2), e);
+    const b = await runPass(getEncodeArgs(input, 2), e);
     if (b.code !== 0) {
       e.log(describeExit(b.code, b.signal));
       return false;
     }
-    return true;
+    return !cancelRequested;
   }
-  const r = await runPass(bin, getEncodeArgs(input, 0), e);
+  if (cancelRequested) return false;
+  const r = await runPass(getEncodeArgs(input, 0), e);
   if (r.code !== 0) e.log(describeExit(r.code, r.signal));
-  return r.code === 0;
+  return !cancelRequested && r.code === 0;
 }
 export async function startEncode(
   req: EncodeRequest,
@@ -154,6 +157,7 @@ export async function startEncode(
     events.log('ffmpeg not found.');
     return;
   }
+  cancelRequested = false;
   encoding.current = true;
   savedTitle = document.title;
   const prog = initProgress(req.avgFrameRate, req.duration);
@@ -161,6 +165,7 @@ export async function startEncode(
   const started = Date.now();
   offStart = window.kurippu.onProcessStart((id) => {
     procId = id;
+    if (cancelRequested) void window.kurippu.killProcess(id);
   });
   offLog = window.kurippu.onProcessLog((_id, text) => {
     for (const line of text.split(/[\r\n]+/)) {
@@ -174,7 +179,7 @@ export async function startEncode(
   try {
     if (req.kind === 'test') {
       const tmp = await window.kurippu.makeTempPath('.mkv');
-      const r = await runPass(bin, getTestArgs(req.rawArgs, tmp), events);
+      const r = await runPass(getTestArgs(req.rawArgs, tmp), events);
       if (r.code === 0) {
         events.log(`Test encode done: ${tmp}`);
         await openOutput(tmp);
@@ -190,10 +195,10 @@ export async function startEncode(
       listPath = await window.kurippu.makeTempPath('.txt');
     }
     const passlog = await window.kurippu.makeTempPath('-0.log');
-    if (!(await encodeMain(bin, req, main, passlog, events, prog))) return;
+    if (!(await encodeMain(req, main, passlog, events, prog))) return;
+    if (cancelRequested) return;
     if (req.preview) {
       const p = await runPass(
-        bin,
         getPreviewArgs({
           inpath: req.preview.path,
           time: req.preview.time,
@@ -211,13 +216,13 @@ export async function startEncode(
         events.log(describeExit(p.code, p.signal));
         return;
       }
+      if (cancelRequested) return;
       const quote = (s: string) => s.replace(/'/g, "'\\''");
       await window.kurippu.writeText(
         listPath,
         `file '${quote(previewPath)}'\n`,
       );
       const c = await runPass(
-        bin,
         getConcatArgs({
           listpath: listPath,
           mainpath: main,
@@ -232,12 +237,14 @@ export async function startEncode(
         events.log(describeExit(c.code, c.signal));
         return;
       }
+      if (cancelRequested) return;
     }
     events.progress(100);
     await logStats(req.outpath, req.duration, Date.now() - started, events);
     events.finished(req.outpath);
   } finally {
     stopPipe();
+    cancelRequested = false;
     encoding.current = false;
     document.title = savedTitle;
   }

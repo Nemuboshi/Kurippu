@@ -1,5 +1,6 @@
 import type {
   MpvPlayerSession,
+  MpvTrackKind,
   PlayerEvent,
   PlayerFrame,
   RenderMode,
@@ -192,11 +193,11 @@ class SharedTextureWebGpuRenderer implements SharedFrameRenderer {
   readonly name = 'Shared texture';
   readonly canvas: HTMLCanvasElement;
   private ready: Promise<void>;
-  private device: any = null;
-  private context: any = null;
-  private pipeline: any = null;
-  private sampler: any = null;
-  private format = 'bgra8unorm';
+  private device: GPUDevice | null = null;
+  private context: GPUCanvasContext | null = null;
+  private pipeline: GPURenderPipeline | null = null;
+  private sampler: GPUSampler | null = null;
+  private format: GPUTextureFormat = 'bgra8unorm';
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -251,28 +252,29 @@ class SharedTextureWebGpuRenderer implements SharedFrameRenderer {
   }
 
   private async init() {
-    const gpu = (navigator as any).gpu;
+    const gpu = navigator.gpu;
     if (!gpu) throw new Error('WebGPU is not available');
     const adapter = await gpu.requestAdapter();
     if (!adapter) throw new Error('No WebGPU adapter available');
-    this.device = await adapter.requestDevice();
-    this.context = this.canvas.getContext('webgpu');
-    if (!this.context)
-      throw new Error('WebGPU canvas context is not available');
+    const device = await adapter.requestDevice();
+    const context = this.canvas.getContext('webgpu') as GPUCanvasContext | null;
+    if (!context) throw new Error('WebGPU canvas context is not available');
+    this.device = device;
+    this.context = context;
     this.format = gpu.getPreferredCanvasFormat();
-    this.context.configure({
-      device: this.device,
+    context.configure({
+      device,
       format: this.format,
       alphaMode: 'opaque',
     });
-    this.sampler = this.device.createSampler({
+    this.sampler = device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
     });
-    this.pipeline = this.device.createRenderPipeline({
+    this.pipeline = device.createRenderPipeline({
       layout: 'auto',
       vertex: {
-        module: this.device.createShaderModule({
+        module: device.createShaderModule({
           code: `
             struct VertexOut {
               @builtin(position) position: vec4f,
@@ -307,7 +309,7 @@ class SharedTextureWebGpuRenderer implements SharedFrameRenderer {
         entryPoint: 'main',
       },
       fragment: {
-        module: this.device.createShaderModule({
+        module: device.createShaderModule({
           code: `
             @group(0) @binding(0) var videoSampler: sampler;
             @group(0) @binding(1) var videoTexture: texture_external;
@@ -502,6 +504,11 @@ export class MpvVideoElement extends HTMLElement {
       this.setAttribute('volume', String(volume));
     }
     await this.player?.setVolume(volume);
+  }
+
+  async setTrack(kind: MpvTrackKind, id: number | null) {
+    await this.ensureReady();
+    await this.player?.setTrack(kind, id);
   }
 
   async setRenderMode(mode: RenderMode) {
