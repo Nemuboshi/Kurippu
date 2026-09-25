@@ -46,7 +46,7 @@ args=()
 for t in "${TYPES[@]}"; do args+=(--allowlist-type "$t"); done
 for f in "${FUNCS[@]}"; do args+=(--allowlist-function "$f"); done
 
-bindgen /usr/include/mpv/render.h -o "$out" "${args[@]}" -- -I/usr/include
+bindgen /usr/include/mpv/render_gl.h -o "$out" "${args[@]}" -- -I/usr/include
 
 # The generated doc attributes are verbatim copies of the header comments and
 # dwarf the declarations; drop them but keep bindgen's layout assertions.

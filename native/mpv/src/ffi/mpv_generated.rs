@@ -312,3 +312,42 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn mpv_render_context_free(ctx: *mut mpv_render_context);
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct mpv_opengl_init_params {
+    pub get_proc_address: ::std::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut ::std::os::raw::c_void,
+            name: *const ::std::os::raw::c_char,
+        ) -> *mut ::std::os::raw::c_void,
+    >,
+    pub get_proc_address_ctx: *mut ::std::os::raw::c_void,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of mpv_opengl_init_params"][::std::mem::size_of::<mpv_opengl_init_params>() - 16usize];
+    ["Alignment of mpv_opengl_init_params"]
+        [::std::mem::align_of::<mpv_opengl_init_params>() - 8usize];
+    ["Offset of field: mpv_opengl_init_params::get_proc_address"]
+        [::std::mem::offset_of!(mpv_opengl_init_params, get_proc_address) - 0usize];
+    ["Offset of field: mpv_opengl_init_params::get_proc_address_ctx"]
+        [::std::mem::offset_of!(mpv_opengl_init_params, get_proc_address_ctx) - 8usize];
+};
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct mpv_opengl_fbo {
+    pub fbo: ::std::os::raw::c_int,
+    pub w: ::std::os::raw::c_int,
+    pub h: ::std::os::raw::c_int,
+    pub internal_format: ::std::os::raw::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of mpv_opengl_fbo"][::std::mem::size_of::<mpv_opengl_fbo>() - 16usize];
+    ["Alignment of mpv_opengl_fbo"][::std::mem::align_of::<mpv_opengl_fbo>() - 4usize];
+    ["Offset of field: mpv_opengl_fbo::fbo"][::std::mem::offset_of!(mpv_opengl_fbo, fbo) - 0usize];
+    ["Offset of field: mpv_opengl_fbo::w"][::std::mem::offset_of!(mpv_opengl_fbo, w) - 4usize];
+    ["Offset of field: mpv_opengl_fbo::h"][::std::mem::offset_of!(mpv_opengl_fbo, h) - 8usize];
+    ["Offset of field: mpv_opengl_fbo::internal_format"]
+        [::std::mem::offset_of!(mpv_opengl_fbo, internal_format) - 12usize];
+};
