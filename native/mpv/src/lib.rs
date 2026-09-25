@@ -2,6 +2,7 @@
 mod callbacks;
 mod ffi;
 mod scale;
+mod value;
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
