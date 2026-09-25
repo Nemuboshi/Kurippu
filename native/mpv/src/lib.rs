@@ -1,6 +1,7 @@
 #![allow(clippy::unused_unit)]
 mod callbacks;
 mod ffi;
+mod scale;
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
