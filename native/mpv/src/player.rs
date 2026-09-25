@@ -41,9 +41,14 @@ pub struct MpvPlayer {
     handle: Option<Handle>,
     hub: Option<Arc<CallbackHub>>,
     software: Option<SoftwareTarget>,
+    #[cfg(target_os = "macos")]
+    shared: Option<crate::render::macos::MacSharedTarget>,
+    #[cfg(target_os = "windows")]
+    shared: Option<crate::render::windows::WinSharedTarget>,
     mode: String,
     deinterlace: bool,
-    // Consumed by the shared-texture targets in Tasks 7 and 8.
+    /// Frame counter handed to electron.sharedTexture; monotonically increases
+    /// per rendered frame, exactly as `timestamp_us_++` did in the C++.
     #[allow(dead_code)]
     timestamp: u64,
     next_observer: u64,
@@ -83,6 +88,12 @@ impl MpvPlayer {
     /// called twice, and `Drop` runs it again after an explicit call.
     fn teardown(&mut self) {
         self.software = None;
+        // The target owns GL/DX state that references the render context, so it
+        // goes first even though the context field is declared ahead of it.
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        {
+            self.shared = None;
+        }
         if let Some(hub) = self.hub.take() {
             if let Some(ctx) = self.render_ctx.take() {
                 hub.clear_render_update(ctx.0);
@@ -181,13 +192,36 @@ impl MpvPlayer {
     }
 
     fn init_render_context(&mut self) -> Result<()> {
-        // Tasks 7 and 8 replace this branch with the macOS and Windows
-        // targets. Everywhere else keeps the message the C++ produced.
         if self.mode == "shared-texture" {
-            return Err(Error::new(
-                Status::GenericFailure,
-                "shared-texture mode is only implemented on macOS and Windows",
-            ));
+            let handle = self.handle()?;
+            #[cfg(target_os = "macos")]
+            let target = crate::render::macos::MacSharedTarget::new(handle).map(Some)?;
+            #[cfg(target_os = "windows")]
+            let target = crate::render::windows::WinSharedTarget::new(handle).map(Some)?;
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            let target = {
+                let _ = handle;
+                None::<()>
+            };
+
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            {
+                let ctx = target.as_ref().expect("constructed").render_ctx();
+                self.render_ctx = Some(RenderCtx(ctx));
+                self.shared = target;
+                if let Some(hub) = self.hub.as_ref() {
+                    hub.install_render_update(ctx);
+                }
+                return Ok(());
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            {
+                drop(target);
+                return Err(Error::new(
+                    Status::GenericFailure,
+                    "shared-texture mode is only implemented on macOS and Windows",
+                ));
+            }
         }
 
         let mut ctx: *mut ffi::mpv_render_context = std::ptr::null_mut();
@@ -519,14 +553,24 @@ impl MpvPlayer {
                 "renderSharedTexture is only available in shared-texture mode",
             ));
         }
-        // Tasks 7 and 8 route this to the platform target once they exist; the
-        // constructor already rejects shared-texture mode on other platforms,
-        // so this arm is unreachable there.
-        let _ = (env, width, height);
-        Err(Error::new(
-            Status::GenericFailure,
-            "renderSharedTexture is only implemented on macOS and Windows",
-        ))
+        let (width, height) = scale::clamp_shared(width, height);
+        let timestamp = self.timestamp;
+        self.timestamp += 1;
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        {
+            let target = self.shared.as_mut().ok_or_else(|| {
+                Error::new(Status::GenericFailure, "shared target is not initialized")
+            })?;
+            target.render(env, width, height, timestamp)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            let _ = (env, width, height, timestamp);
+            Err(Error::new(
+                Status::GenericFailure,
+                "renderSharedTexture is only implemented on macOS and Windows",
+            ))
+        }
     }
 
     #[napi]
