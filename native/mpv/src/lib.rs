@@ -1,4 +1,6 @@
 #![allow(clippy::unused_unit)]
+mod ffi;
+
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
