@@ -256,12 +256,17 @@ impl MacSharedTarget {
             )
         } as i32;
 
-        set_number(kIOSurfaceWidth, width);
-        set_number(kIOSurfaceHeight, height);
-        set_number(kIOSurfaceBytesPerElement, 4);
-        set_number(kIOSurfaceBytesPerRow, bytes_per_row);
-        set_number(kIOSurfaceAllocSize, alloc_size);
-        set_number(kIOSurfacePixelFormat, fourcc(b'B', b'G', b'R', b'A'));
+        // Reading an extern static is itself an unsafe act: the linker symbol
+        // holds the CFStringRef value, so this loads a pointer rather than
+        // taking the address of the import slot.
+        unsafe {
+            set_number(kIOSurfaceWidth, width);
+            set_number(kIOSurfaceHeight, height);
+            set_number(kIOSurfaceBytesPerElement, 4);
+            set_number(kIOSurfaceBytesPerRow, bytes_per_row);
+            set_number(kIOSurfaceAllocSize, alloc_size);
+            set_number(kIOSurfacePixelFormat, fourcc(b'B', b'G', b'R', b'A'));
+        }
 
         let surface = unsafe { IOSurfaceCreate(props) };
         unsafe { CFRelease(props) };
