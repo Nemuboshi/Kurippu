@@ -1,0 +1,184 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:media="using:Kurippu.Desktop.Media"
+        x:Class="Kurippu.Desktop.MainWindow"
+        Title="Kurippu" Width="1280" Height="820" MinWidth="1180" MinHeight="720"
+        Background="{DynamicResource CanvasBrush}" Foreground="{DynamicResource InkBrush}" >
+  <Window.Styles>
+    <Style Selector="TextBlock.section"><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+    <Style Selector="Button"><Setter Property="Margin" Value="3"/><Setter Property="Padding" Value="12,8"/><Setter Property="MinHeight" Value="35"/><Setter Property="Background" Value="{DynamicResource RaisedBrush}"/><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/><Setter Property="CornerRadius" Value="4"/></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="{DynamicResource AccentInkBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="TextBox"><Setter Property="Margin" Value="3"/><Setter Property="MinHeight" Value="34"/><Setter Property="CornerRadius" Value="6"/></Style>
+    <Style Selector="ComboBox"><Setter Property="Margin" Value="3"/><Setter Property="MinHeight" Value="34"/></Style>
+    <Style Selector="TabControl"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/></Style>
+    <Style Selector="TabItem"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="WrapPanel > TextBlock"><Setter Property="VerticalAlignment" Value="Center"/></Style>
+    <Style Selector="WrapPanel > CheckBox"><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  </Window.Styles>
+  <Grid RowDefinitions="*,Auto">
+    <Grid Grid.Row="0">
+      <ScrollViewer x:Name="SourceScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <Grid MinHeight="600">
+      <Border x:Name="SourcePanel" Background="{DynamicResource SurfaceBrush}" CornerRadius="14" Padding="32"
+              HorizontalAlignment="Center" VerticalAlignment="Center" Width="520" MaxWidth="520">
+        <StackPanel Spacing="16">
+          <TextBlock Text="KURIPPU / NEW PROJECT" Classes="section"/>
+          <TextBlock Text="Make the clip you mean." FontSize="32" FontWeight="Bold"/>
+          <TextBlock Text="Open a video file or enter a URL supported by yt-dlp." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"/>
+          <Button Classes="primary" Content="Open video file" Click="OnOpenFile" HorizontalAlignment="Stretch" MinHeight="48"/>
+          <TextBox x:Name="UrlBox" PlaceholderText="Paste a video URL"/>
+          <Button Content="Resolve URL" Click="OnOpenUrl" HorizontalAlignment="Stretch"/>
+          <StackPanel x:Name="FormatPanel" IsVisible="False" Spacing="6">
+            <TextBlock x:Name="UrlTitleText" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock Text="Video / audio / subtitles"/>
+            <ComboBox x:Name="UrlVideoBox"/><ComboBox x:Name="UrlAudioBox"/><ComboBox x:Name="UrlSubtitleBox"/>
+            <Button Classes="primary" Content="Download selected formats" Click="OnDownloadUrl"/>
+          </StackPanel>
+          <Button x:Name="CancelDownloadButton" Content="Cancel URL operation" Click="OnCancelDownload" IsVisible="False"/>
+        </StackPanel>
+      </Border>
+      </Grid></ScrollViewer>
+      <TextBlock x:Name="InfoText" IsVisible="False" Text="Gathering video info..." HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
+      <Grid x:Name="EditorPanel" IsVisible="False" RowDefinitions="*" ColumnDefinitions="*,420" Margin="16" ColumnSpacing="16">
+        <Grid x:Name="PreviewPane" Grid.Column="0" RowDefinitions="*,Auto,Auto" RowSpacing="10">
+          <Border Grid.Row="0" Background="#0E1412" CornerRadius="12" ClipToBounds="True" MinHeight="220">
+            <media:VideoStage x:Name="VideoStage">
+              <media:MpvVideoControl x:Name="VideoSurface"/>
+              <media:CropOverlayControl x:Name="CropOverlay" ToolTip.Tip="Drag to crop; drag selection to move or resize by any edge; right-click to clear"/>
+            </media:VideoStage>
+          </Border>
+          <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="10" Padding="10,8">
+            <StackPanel Spacing="4">
+              <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
+                <Button x:Name="PlayButton" Content="Play / Pause" Click="OnPlayPause"/>
+                <Button Grid.Column="1" Content="Frame -" Click="OnFrameBackStep"/>
+                <Button Grid.Column="2" Content="Frame +" Click="OnFrameStep"/>
+                <media:RangeTimeline x:Name="SeekSlider" Grid.Column="3" Maximum="100" Margin="8,0" VerticalAlignment="Center"
+                                     TrackBrush="{DynamicResource LineBrush}" HighlightBrush="{DynamicResource AccentBrush}"
+                                     ThumbBrush="{DynamicResource SurfaceBrush}" PropertyChanged="OnSeekChanged"/>
+                <TextBlock x:Name="ClockText" Grid.Column="4" Text="00:00 / 00:00" VerticalAlignment="Center" Margin="8"/>
+              </Grid>
+              <WrapPanel>
+                <Button Content="Mark start [" Click="OnMarkStart" ToolTip.Tip="Set fragment start ([)"/>
+                <TextBox x:Name="StartBox" Width="95" PlaceholderText="Start" ToolTip.Tip="Fragment start; edit or mark with ["/>
+                <Button Content="Mark end ]" Click="OnMarkEnd" ToolTip.Tip="Set fragment end (])"/>
+                <TextBox x:Name="EndBox" Width="95" PlaceholderText="End" ToolTip.Tip="Fragment end; edit or mark with ]"/>
+                <CheckBox x:Name="LoopBox" Content="Loop fragment" VerticalAlignment="Center" Margin="8,0"/>
+                <TextBox x:Name="TimeBox" Width="90" ToolTip.Tip="Enter a time and press Enter" KeyDown="OnTimeKeyDown"/>
+                <Button x:Name="MuteButton" Content="Mute" Click="OnMute"/>
+                <Slider x:Name="VolumeSlider" Width="95" Minimum="0" Maximum="100" Value="100" VerticalAlignment="Center" PropertyChanged="OnVolumeChanged"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <TextBlock x:Name="ValidationText" Grid.Row="2" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap"/>
+        </Grid>
+        <Border x:Name="InspectorPane" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="12" ClipToBounds="True">
+          <Grid>
+        <TabControl x:Name="EditorTabs">
+          <TabItem Header="Info"><ScrollViewer><StackPanel Margin="16" Spacing="14">
+            <TextBlock Text="Source details" FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock x:Name="MediaDetails" TextWrapping="Wrap"/>
+            <Button x:Name="ChangeSourceButton" Content="Change source" Click="OnChangeSource" IsVisible="False" HorizontalAlignment="Left"/>
+          </StackPanel></ScrollViewer></TabItem>
+          <TabItem Header="Picture"><ScrollViewer><StackPanel Margin="16" Spacing="16">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Crop (source pixels; even values)" FontWeight="SemiBold"/>
+              <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+                <StackPanel Grid.Column="0" Spacing="4"><TextBlock Text="WIDTH" Classes="section"/><TextBox x:Name="CropWidthBox" PlaceholderText="auto"/></StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="HEIGHT" Classes="section"/><TextBox x:Name="CropHeightBox" PlaceholderText="auto"/></StackPanel>
+                <StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="X" Classes="section"/><TextBox x:Name="CropXBox" PlaceholderText="0"/></StackPanel>
+                <StackPanel Grid.Column="3" Spacing="4"><TextBlock Text="Y" Classes="section"/><TextBox x:Name="CropYBox" PlaceholderText="0"/></StackPanel>
+              </Grid>
+              <WrapPanel><Button Content="Detect bars" Click="OnDetectCrop"/><Button Content="Clear crop" Click="OnClearCrop"/></WrapPanel>
+            </StackPanel>
+            <StackPanel Spacing="8">
+              <TextBlock Text="Scale and display" FontWeight="SemiBold"/>
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Spacing="4"><TextBlock Text="WIDTH" Classes="section"/><TextBox x:Name="ScaleWidthBox" PlaceholderText="auto"/></StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="HEIGHT" Classes="section"/><TextBox x:Name="ScaleHeightBox" PlaceholderText="auto"/></StackPanel>
+              </Grid>
+              <CheckBox x:Name="FixSarBox" Content="Fix sample aspect ratio"/>
+              <CheckBox x:Name="DeinterlaceBox" Content="Deinterlace" Click="OnEditorOptionChanged"/>
+              <Button Content="Detect interlace" Click="OnDetectInterlace" HorizontalAlignment="Left"/>
+            </StackPanel>
+            <StackPanel Spacing="8">
+              <TextBlock Text="Tracks and subtitles" FontWeight="SemiBold"/>
+              <Grid ColumnDefinitions="92,*" ColumnSpacing="8">
+                <TextBlock Text="Video" VerticalAlignment="Center"/>
+                <ComboBox x:Name="VideoTrackBox" Grid.Column="1" SelectionChanged="OnEditorOptionChanged"/>
+              </Grid>
+              <Grid ColumnDefinitions="92,*" ColumnSpacing="8">
+                <TextBlock Text="Subtitles" VerticalAlignment="Center"/>
+                <ComboBox x:Name="SubtitleTrackBox" Grid.Column="1" SelectionChanged="OnEditorOptionChanged"/>
+              </Grid>
+              <CheckBox x:Name="BurnSubsBox" Content="Burn subtitles" IsEnabled="False"/>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                <TextBox x:Name="SubtitlePathBox" PlaceholderText="External subtitle path (optional)"/>
+                <Button Grid.Column="1" Content="Browse..." Click="OnSubtitleFile"/>
+              </Grid>
+            </StackPanel>
+          </StackPanel></ScrollViewer></TabItem>
+          <TabItem Header="Audio"><ScrollViewer><StackPanel Margin="16" Spacing="16">
+            <CheckBox x:Name="HasAudioBox" Content="Include audio" IsChecked="True" Click="OnEditorOptionChanged"/>
+            <Grid ColumnDefinitions="92,*" ColumnSpacing="8">
+              <TextBlock Text="Track" VerticalAlignment="Center"/><ComboBox x:Name="AudioTrackBox" Grid.Column="1" SelectionChanged="OnEditorOptionChanged"/>
+            </Grid>
+            <Grid ColumnDefinitions="92,*" ColumnSpacing="8">
+              <TextBlock Text="Codec" VerticalAlignment="Center"/>
+              <ComboBox x:Name="AudioCodecBox" Grid.Column="1"><ComboBoxItem Content="aac"/><ComboBoxItem Content="opus"/><ComboBoxItem Content="vorbis"/><ComboBoxItem Content="copy"/></ComboBox>
+            </Grid>
+            <Grid ColumnDefinitions="92,*" ColumnSpacing="8">
+              <TextBlock Text="Bitrate / quality" VerticalAlignment="Center" TextWrapping="Wrap"/><TextBox x:Name="AudioBitrateBox" Grid.Column="1" PlaceholderText="default"/>
+            </Grid>
+            <TextBlock Text="Audio effects" FontWeight="SemiBold"/>
+            <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Amplify" VerticalAlignment="Center"/><TextBox x:Name="AmplifyBox" Grid.Column="1"/></Grid>
+            <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Fade in" VerticalAlignment="Center"/><TextBox x:Name="FadeInBox" Grid.Column="1"/></Grid>
+            <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Fade out" VerticalAlignment="Center"/><TextBox x:Name="FadeOutBox" Grid.Column="1"/></Grid>
+          </StackPanel></ScrollViewer></TabItem>
+          <TabItem Header="Export"><ScrollViewer><StackPanel Margin="16" Spacing="16">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Output" FontWeight="SemiBold"/>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4"><TextBox x:Name="OutputBox" PlaceholderText="Output file"/><Button Grid.Column="1" Content="Browse..." Click="OnOutputFile"/></Grid>
+              <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Title" VerticalAlignment="Center"/><TextBox x:Name="TitleBox" Grid.Column="1"/></Grid>
+            </StackPanel>
+            <StackPanel Spacing="8">
+              <TextBlock Text="Encode" FontWeight="SemiBold"/>
+              <WrapPanel><Button x:Name="EncodeButton" Classes="primary" Content="Encode" Click="OnEncode"/><Button Content="Cancel" Click="OnCancelEncode"/></WrapPanel>
+              <ProgressBar x:Name="EncodeProgress" Height="16" Maximum="100" Margin="3,0"/>
+              <WrapPanel><Button Content="Open output" Click="OnOpenOutput"/><Button Content="Show folder" Click="OnShowOutputFolder"/></WrapPanel>
+            </StackPanel>
+            <StackPanel Spacing="8">
+              <TextBlock Text="Preview source" FontWeight="SemiBold"/>
+              <TextBox x:Name="PreviewPathBox" PlaceholderText="Optional preview source"/>
+              <WrapPanel><Button Content="Current frame" Click="OnPreviewCurrentFrame"/><Button Content="Image..." Click="OnPreviewFile"/><Button Content="Clear preview" Click="OnClearPreview"/></WrapPanel>
+              <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Time (s)" VerticalAlignment="Center"/><TextBox x:Name="PreviewTimeBox" Grid.Column="1" PlaceholderText="optional"/></Grid>
+            </StackPanel>
+            <Expander x:Name="AdvancedSettings" Header="Advanced encoding" IsExpanded="False">
+              <StackPanel Spacing="10" Margin="0,8,0,0">
+                <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Video codec" VerticalAlignment="Center"/><ComboBox x:Name="VideoCodecBox" Grid.Column="1" SelectionChanged="OnEditorOptionChanged"><ComboBoxItem Content="x264"/><ComboBoxItem Content="vp9"/><ComboBoxItem Content="vp8"/><ComboBoxItem Content="av1"/></ComboBox></Grid>
+                <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Preset" VerticalAlignment="Center"/><ComboBox x:Name="PresetBox" Grid.Column="1"><ComboBoxItem Content="ultrafast"/><ComboBoxItem Content="fast"/><ComboBoxItem Content="medium"/><ComboBoxItem Content="slow"/><ComboBoxItem Content="veryslow"/></ComboBox></Grid>
+                <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Limit / Kbps" VerticalAlignment="Center"/><TextBox x:Name="LimitBox" Grid.Column="1" PlaceholderText="default"/></Grid>
+                <WrapPanel><CheckBox x:Name="LimitModeBox" Content="Target size (MiB)" Margin="3,0,12,0"/><CheckBox x:Name="CrfModeBox" Content="CRF"/><CheckBox x:Name="TwoPassBox" Content="Two pass" Margin="12,0,0,0"/></WrapPanel>
+                <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Quality" VerticalAlignment="Center"/><TextBox x:Name="QualityBox" Grid.Column="1" PlaceholderText="default"/></Grid>
+                <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Threads" VerticalAlignment="Center"/><TextBox x:Name="ThreadsBox" Grid.Column="1" Text="8"/></Grid>
+                <Grid ColumnDefinitions="92,*" ColumnSpacing="8"><TextBlock Text="Thread mode" VerticalAlignment="Center"/><ComboBox x:Name="MultithreadingBox" Grid.Column="1"><ComboBoxItem Content="row-mt"/><ComboBoxItem Content="tile-col"/><ComboBoxItem Content="no-mt"/></ComboBox></Grid>
+                <TextBlock Text="Raw FFmpeg arguments (edits persist until options change)" TextWrapping="Wrap"/>
+                <TextBox x:Name="RawArgumentsBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="85"/>
+              </StackPanel>
+            </Expander>
+          </StackPanel></ScrollViewer></TabItem>
+        </TabControl>
+
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+    <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="16,8">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBlock x:Name="StatusText" Text="Open or drop a video to begin" Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+              <Button x:Name="LogButton" Grid.Column="1" Content="Detail log" Click="OnOpenLog" ToolTip.Tip="Open detailed activity log"/>
+              <ComboBox x:Name="ThemeBox" Grid.Column="2" Width="110" SelectedIndex="0" SelectionChanged="OnThemeChanged" ToolTip.Tip="Appearance">
+                <ComboBoxItem Content="System"/><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/>
+              </ComboBox></Grid>
+    </Border>
+  </Grid>
+</Window>

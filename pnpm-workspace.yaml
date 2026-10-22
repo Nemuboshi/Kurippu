@@ -1,5 +1,0 @@
-packages:
-  - native/mpv
-allowBuilds:
-  esbuild: true
-  electron: true

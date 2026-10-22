@@ -1,0 +1,80 @@
+name: Avalonia
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  candidate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-15
+            rid: osx-arm64
+          - os: ubuntu-24.04
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.402
+      - name: Native build tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install mpv
+      - name: Native build tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libmpv-dev patchelf xvfb
+      - name: Restore and test
+        run: dotnet test avalonia/Kurippu.slnx -c Release
+      - name: Packaging script tests
+        run: python -m unittest discover -s avalonia/scripts -p 'test_*.py'
+      - name: Publish
+        run: dotnet publish avalonia/Kurippu.Desktop/Kurippu.Desktop.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o avalonia/publish/${{ matrix.rid }}
+      - name: Stage native runtime
+        run: python avalonia/scripts/stage_runtime.py ${{ matrix.rid }} avalonia/publish/${{ matrix.rid }}
+      - name: Measure and package
+        shell: bash
+        run: |
+          du -sh avalonia/publish/${{ matrix.rid }}
+          cd avalonia/publish
+          tar -czf ../../kurippu-${{ matrix.rid }}.tar.gz ${{ matrix.rid }}
+          ls -lh ../../kurippu-${{ matrix.rid }}.tar.gz
+          cd ../..
+          mkdir -p avalonia/extracted
+          tar -xzf kurippu-${{ matrix.rid }}.tar.gz -C avalonia/extracted
+      - name: Extracted artifact smoke (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $app = (Resolve-Path 'avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop.exe').Path
+          $process = Start-Process -FilePath $app -ArgumentList '--smoke' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+          $process = Start-Process -FilePath $app -ArgumentList '--ui-smoke' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+          $process = Start-Process -FilePath $app -ArgumentList '--ui-open-smoke' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+      - name: Extracted artifact smoke (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --smoke
+          avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-smoke
+          avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-open-smoke
+      - name: Extracted artifact smoke (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --smoke
+          xvfb-run -a avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-smoke
+          xvfb-run -a avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-open-smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kurippu-avalonia-${{ matrix.rid }}
+          path: kurippu-${{ matrix.rid }}.tar.gz

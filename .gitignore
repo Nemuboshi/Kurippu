@@ -8,3 +8,9 @@ bin/
 .pi/
 .vitest/
 native/mpv/build/
+avalonia/**/bin/
+avalonia/**/obj/
+avalonia/publish/
+avalonia/extracted/
+avalonia/scripts/__pycache__/
+.superpowers/
