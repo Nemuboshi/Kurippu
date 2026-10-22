@@ -21,8 +21,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -79,6 +81,54 @@ void throw_mpv_error(Napi::Env env, const std::string& action, int code) {
   Napi::Error::New(env, out.str()).ThrowAsJavaScriptException();
 }
 
+Napi::Value mpv_node_to_js(Napi::Env env, const mpv_node& node) {
+  switch (node.format) {
+    case MPV_FORMAT_STRING:
+      return node.u.string ? Napi::String::New(env, node.u.string) : env.Null();
+    case MPV_FORMAT_FLAG:
+      return Napi::Boolean::New(env, node.u.flag != 0);
+    case MPV_FORMAT_INT64:
+      return Napi::Number::New(env, static_cast<double>(node.u.int64));
+    case MPV_FORMAT_DOUBLE:
+      return Napi::Number::New(env, node.u.double_);
+    case MPV_FORMAT_NODE_ARRAY: {
+      const auto* list = node.u.list;
+      const auto length = list && list->num > 0 ? list->num : 0;
+      Napi::Array result = Napi::Array::New(env, length);
+      if (list) {
+        for (int i = 0; i < length; ++i) {
+          result.Set(i, mpv_node_to_js(env, list->values[i]));
+        }
+      }
+      return result;
+    }
+    case MPV_FORMAT_NODE_MAP: {
+      Napi::Object result = Napi::Object::New(env);
+      const auto* list = node.u.list;
+      if (list) {
+        for (int i = 0; i < list->num; ++i) {
+          if (list->keys && list->keys[i]) {
+            result.Set(
+                list->keys[i], mpv_node_to_js(env, list->values[i]));
+          }
+        }
+      }
+      return result;
+    }
+    case MPV_FORMAT_BYTE_ARRAY: {
+      const auto* bytes = node.u.ba;
+      if (!bytes || !bytes->data || bytes->size == 0) {
+        return Napi::Buffer<uint8_t>::New(env, 0);
+      }
+      return Napi::Buffer<uint8_t>::Copy(
+          env, static_cast<const uint8_t*>(bytes->data), bytes->size);
+    }
+    case MPV_FORMAT_NONE:
+    default:
+      return env.Null();
+  }
+}
+
 #ifdef _WIN32
 std::string hex_u32(unsigned long value) {
   std::ostringstream out;
@@ -132,6 +182,7 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
       InstanceMethod("stop", &MpvPlayer::Stop),
       InstanceMethod("seek", &MpvPlayer::Seek),
       InstanceMethod("setVolume", &MpvPlayer::SetVolume),
+      InstanceMethod("setTrack", &MpvPlayer::SetTrack),
       InstanceMethod("getProperty", &MpvPlayer::GetProperty),
       InstanceMethod("setDeinterlace", &MpvPlayer::SetDeinterlace),
       InstanceMethod("setUpdateCallback", &MpvPlayer::SetUpdateCallback),
@@ -165,6 +216,7 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
     set_option("msg-level", "all=warn");
     set_option("input-default-bindings", "no");
     set_option("audio-display", "no");
+    set_option("sid", "no");
     set_option("pause", "yes");
     set_option("keep-open", "yes");
     const char* hwdec = std::getenv("MPV_HWDEC");
@@ -369,8 +421,31 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
     }
     std::string name = info[0].As<Napi::String>().Utf8Value();
 
-    // String properties cover the probe path (duration is double, track-list
-    // and metadata are node, but node reads back as strings for our fields).
+    if (name == "track-list" || name == "metadata") {
+      mpv_node node{};
+      if (mpv_get_property(handle_, name.c_str(), MPV_FORMAT_NODE, &node) < 0) {
+        return env.Null();
+      }
+      Napi::Value result = mpv_node_to_js(env, node);
+      mpv_free_node_contents(&node);
+      return result;
+    }
+
+    if (name == "duration" || name == "demuxer-bitrate" ||
+        name == "file-size") {
+      double number = 0;
+      if (mpv_get_property(handle_, name.c_str(), MPV_FORMAT_DOUBLE, &number) >=
+          0) {
+        return Napi::Number::New(env, number);
+      }
+      int64_t integer = 0;
+      if (mpv_get_property(handle_, name.c_str(), MPV_FORMAT_INT64, &integer) >=
+          0) {
+        return Napi::Number::New(env, static_cast<double>(integer));
+      }
+      return env.Null();
+    }
+
     char* str_value = mpv_get_property_string(handle_, name.c_str());
     if (str_value) {
       Napi::String result = Napi::String::New(env, str_value);
@@ -396,15 +471,62 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
       Napi::TypeError::New(env, "setDeinterlace(on) requires a boolean").ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    // Remove first so repeated enables never stack a second yadif.
-    int removed = command({"vf-remove", "yadif"});
-    if (info[0].As<Napi::Boolean>().Value()) {
+    const bool enabled = info[0].As<Napi::Boolean>().Value();
+    if (enabled == deinterlace_enabled_) return env.Undefined();
+
+    if (deinterlace_enabled_) {
+      int removed = command({"vf-remove", "yadif"});
+      if (removed < 0 && removed != MPV_ERROR_PROPERTY_NOT_FOUND &&
+          removed != MPV_ERROR_COMMAND) {
+        throw_mpv_error(env, "vf-remove", removed);
+        return env.Undefined();
+      }
+    }
+    if (enabled) {
       int added = command({"vf-add", "yadif"});
       if (added < 0) throw_mpv_error(env, "vf-add", added);
-    } else if (removed < 0 && removed != MPV_ERROR_PROPERTY_NOT_FOUND) {
-      // Not found just means no filter was ever installed.
-      throw_mpv_error(env, "vf-remove", removed);
     }
+    deinterlace_enabled_ = enabled;
+    return env.Undefined();
+  }
+
+  Napi::Value SetTrack(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsString()) {
+      Napi::TypeError::New(
+        env,
+        "setTrack(kind, id) requires a track kind and an id or null"
+      ).ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+
+    const std::string kind = info[0].As<Napi::String>().Utf8Value();
+    const char* property = nullptr;
+    if (kind == "video") property = "vid";
+    else if (kind == "audio") property = "aid";
+    else if (kind == "subtitle") property = "sid";
+    else {
+      Napi::RangeError::New(env, "Unknown track kind").ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+
+    std::string value = "no";
+    if (!info[1].IsNull()) {
+      if (!info[1].IsNumber()) {
+        Napi::TypeError::New(env, "track id must be an integer or null").ThrowAsJavaScriptException();
+        return env.Undefined();
+      }
+      const double id = info[1].As<Napi::Number>().DoubleValue();
+      if (!std::isfinite(id) || id < 0 || std::floor(id) != id ||
+          id > 9007199254740991.0) {
+        Napi::RangeError::New(env, "track id must be a non-negative integer").ThrowAsJavaScriptException();
+        return env.Undefined();
+      }
+      value = std::to_string(static_cast<int64_t>(id));
+    }
+
+    const int ret = command({"set", property, value});
+    if (ret < 0) throw_mpv_error(env, "set track", ret);
     return env.Undefined();
   }
 
@@ -1172,6 +1294,7 @@ class MpvPlayer : public Napi::ObjectWrap<MpvPlayer> {
   Napi::ThreadSafeFunction event_callback_;
   uint64_t next_observer_id_ = 1;
   std::string mode_ = "software";
+  bool deinterlace_enabled_ = false;
   int64_t timestamp_us_ = 0;
 #ifdef __APPLE__
   CGLContextObj gl_context_ = nullptr;

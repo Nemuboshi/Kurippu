@@ -1,5 +1,6 @@
 export type RenderMode = 'shared-texture' | 'webgl' | 'canvas2d';
 export type RenderPipeline = 'shared-texture' | 'software';
+export type MpvTrackKind = 'video' | 'audio' | 'subtitle';
 
 export type PlayerFrame = {
   playerId: string;
@@ -32,6 +33,7 @@ export type MpvPlayerSession = {
   stop(): Promise<void>;
   seek(seconds: number): Promise<void>;
   setVolume(value: number): Promise<void>;
+  setTrack(kind: MpvTrackKind, id: number | null): Promise<void>;
   getProperty(name: string): Promise<unknown>;
   setDeinterlace(on: boolean): Promise<void>;
   setRenderSize(width: number, height: number): Promise<void>;

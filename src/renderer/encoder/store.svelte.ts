@@ -23,6 +23,22 @@ export const EXTERNAL_TRACK = '-1';
 
 const VIDEO_CODECS = ['av1', 'vp9', 'vp8', 'x264'] as const;
 
+function mediaForVideoTrack(media: MediaInfo, value: string): MediaInfo {
+  const parsed = Number(value);
+  const vtrackn =
+    Number.isSafeInteger(parsed) && parsed >= 0 && parsed < media.vtracks.length
+      ? parsed
+      : 0;
+  const track = media.vtracks[vtrackn];
+  return {
+    ...media,
+    width: track?.width ?? media.width,
+    height: track?.height ?? media.height,
+    sar: track?.sar ?? media.sar,
+    vtrackn,
+  };
+}
+
 export class EncoderStore {
   media = $state<MediaInfo | null>(null);
   sourcePath = $state('');
@@ -39,7 +55,7 @@ export class EncoderStore {
   scaleh = $state('');
   fixSAR = $state(false);
   burnSubs = $state(false);
-  strack = $state('0');
+  strack = $state('');
   subpath = $state('');
 
   // audio fx
@@ -107,7 +123,7 @@ export class EncoderStore {
             modeMT: this.modeMT,
             preset: this.preset,
           },
-          { ...this.media, vtrackn: Number.parseInt(this.vtrack, 10) || 0 },
+          mediaForVideoTrack(this.media, this.vtrack),
           this.threads,
         )
       : null,
@@ -140,7 +156,7 @@ export class EncoderStore {
     this.sourcePath = media.path;
     this.vtrack = '0';
     this.atrack = '0';
-    this.strack = '0';
+    this.strack = '';
     this.subpath = '';
     this.hasAudio = media.atracks.length > 0;
     this.fixSAR = isAnamorphic(media.sar);
@@ -202,7 +218,10 @@ export class EncoderStore {
   // other choice drops it.
   selectStrack(v: string): void {
     this.strack = v;
-    if (v !== EXTERNAL_TRACK) this.subpath = '';
+    if (v !== EXTERNAL_TRACK) {
+      this.subpath = '';
+      if (v === '') this.burnSubs = false;
+    }
   }
 
   clearCrop(): void {
@@ -241,7 +260,7 @@ export class EncoderStore {
         start,
         Number.parseInt(this.vtrack, 10) || 0,
       );
-      const { stdout } = await window.kurippu.runProcess(ffmpeg, args);
+      const { stdout } = await window.kurippu.runProcess('ffmpeg', args);
       if (parseInterlaceOutput(stdout)) this.deinterlace = true;
     } catch {
       // Detection is best-effort; the user can still toggle the checkbox.
@@ -264,7 +283,7 @@ export class EncoderStore {
         start,
         Number.parseInt(this.vtrack, 10) || 0,
       );
-      const { stdout } = await window.kurippu.runProcess(ffmpeg, args);
+      const { stdout } = await window.kurippu.runProcess('ffmpeg', args);
       const area = parseCropDetectOutput(stdout);
       if (!area) return;
       if (area.w >= media.width && area.h >= media.height) {

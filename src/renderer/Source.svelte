@@ -53,7 +53,7 @@ async function startResolve(): Promise<void> {
     return;
   }
   resolving = true;
-  const r = await api.runProcess(ytdlp, resolveArgs(url));
+  const r = await api.runProcess('yt-dlp', resolveArgs(url));
   resolving = false;
   if (r.code !== 0) {
     error = `yt-dlp failed with code ${r.code ?? r.signal}`;
@@ -78,7 +78,13 @@ async function startResolve(): Promise<void> {
   }
 }
 
-function onZoneClick(): void {
+function onZoneClick(event?: MouseEvent): void {
+  if (
+    event?.target instanceof Element &&
+    event.target.closest('.formats') !== null
+  ) {
+    return;
+  }
   if (error) {
     error = '';
     return;
@@ -87,12 +93,22 @@ function onZoneClick(): void {
   else void pickFile();
 }
 
+function onZoneKeydown(event: KeyboardEvent): void {
+  if (event.target !== event.currentTarget) return;
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    onZoneClick();
+  }
+}
+
 async function startDownload(): Promise<void> {
   if (!info) return;
-  const ytdlp = (await api.resolveYtDlp()) ?? 'yt-dlp';
+  if (!(await api.resolveYtDlp())) {
+    error = 'yt-dlp not found, install: https://github.com/yt-dlp/yt-dlp';
+    return;
+  }
   const ffmpeg = await api.resolveFfmpeg();
   outpath = await api.makeTempPath('.mkv');
-  await api.registerTempFile(outpath);
   downloading = true;
   downloadFailed = false;
   progress = 0;
@@ -119,7 +135,7 @@ async function startDownload(): Promise<void> {
   offStart = api.onProcessStart((id) => {
     procId = id;
   });
-  const r = await api.runProcess(ytdlp, args);
+  const r = await api.runProcess('yt-dlp', args);
   off();
   offStart?.();
   offStart = null;
@@ -147,14 +163,22 @@ async function cancelDownload(): Promise<void> {
   if (outpath) {
     // Remove yt-dlp leftovers from the aborted download.
     await api.deleteFiles(ytdlpLeftovers(outpath, vfid, afid, sid, subExt));
-    await api.unregisterTempFile(outpath);
   }
 }
 </script>
 
 <div class="source">
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="zone" class:disabled={resolving || downloading} onclick={onZoneClick} ondrop={onDrop} ondragover={(e) => e.preventDefault()}>
+  <div
+    class="zone"
+    class:disabled={resolving || downloading}
+    role="button"
+    tabindex="0"
+    aria-label="Open or drop a video source"
+    onclick={onZoneClick}
+    onkeydown={onZoneKeydown}
+    ondrop={onDrop}
+    ondragover={(e) => e.preventDefault()}
+  >
     {#if downloading}
       <div class="status" class:error-text={downloadFailed}>{statusLine}</div>
       <progress value={progress} max="100"></progress>
@@ -167,7 +191,7 @@ async function cancelDownload(): Promise<void> {
       {@const auds = audioFormats(info)}
       {@const subs = subtitleFormats(info)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="formats" onclick={(e) => e.stopPropagation()}>
+      <div class="formats">
         <label>Video format
           <select bind:value={vfid} disabled={vids.length === 0}>
             {#each vids as f}<option value={f.id}>{f.label}</option>{/each}
@@ -193,8 +217,7 @@ async function cancelDownload(): Promise<void> {
       <p>Click/drag your source video here</p>
       <p>or <input type="text" placeholder="enter URL" bind:value={url} disabled={resolving} onclick={(e) => e.stopPropagation()} /></p>
       {#if error}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <p class="error-text" onclick={(e) => e.stopPropagation()}>{error}</p>
+        <p class="error-text">{error}</p>
       {/if}
     {/if}
   </div>

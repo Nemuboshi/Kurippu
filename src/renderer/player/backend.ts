@@ -3,6 +3,12 @@
 
 import type { MediaInfo } from '../../engine/options';
 
+export type PlayerTrackSelection = {
+  videoId: number;
+  audioId: number | null;
+  subtitleId: number | null;
+};
+
 export interface PlayerBackend {
   // Attaches rendering to the container. The mpv addon draws via HWND/wid.
   attach(el: HTMLElement): void;
@@ -16,6 +22,7 @@ export interface PlayerBackend {
   // volume: 0-100.
   setVolume(volume: number): void;
   setMuted(muted: boolean): void;
+  setTracks(selection: PlayerTrackSelection): void;
   // Toggles yadif deinterlacing on the libmpv video chain.
   setDeinterlace(on: boolean): void;
   // Registers a time observer. Returns an unsubscribe function.

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { type EncoderStore, EXTERNAL_TRACK } from './store.svelte';
+import { isTextSubtitleCodec } from '../../engine/options';
 
 interface Props {
   store: EncoderStore;
@@ -11,11 +12,31 @@ function trackLabel(i: number, codec: string, extra: string): string {
   return extra ? `#${i} (${codec}, ${extra})` : `#${i} (${codec})`;
 }
 
+function subtitleLabel(
+  i: number,
+  codec: string,
+  lang: string | undefined,
+  title: string | undefined,
+): string {
+  const kind = isTextSubtitleCodec(codec) ? 'text' : 'image';
+  const extra = [kind, lang, title].filter(Boolean).join(', ');
+  return trackLabel(i, codec, extra);
+}
+
 const media = $derived.by(() => store.media);
 const validation = $derived.by(() => store.derived);
 
 const subsDisabled = $derived(
   (media?.stracks.length ?? 0) === 0 && store.subpath === '',
+);
+const selectedSubtitle = $derived.by(() => {
+  if (!media || store.subpath !== '' || store.strack === EXTERNAL_TRACK)
+    return null;
+  const index = Number.parseInt(store.strack, 10);
+  return Number.isInteger(index) ? (media.stracks[index] ?? null) : null;
+});
+const imageSubtitle = $derived(
+  selectedSubtitle !== null && !isTextSubtitleCodec(selectedSubtitle.codec),
 );
 
 function basename(p: string): string {
@@ -96,8 +117,11 @@ function basename(p: string): string {
       disabled={subsDisabled}
       onchange={(e) => store.selectStrack(e.currentTarget.value)}
     >
+      <option value="">none</option>
       {#each media?.stracks ?? [] as t, i (i)}
-        <option value={String(i)}>{trackLabel(i, t.codec, t.lang ?? '')}</option>
+        <option value={String(i)}>
+          {subtitleLabel(i, t.codec, t.lang, t.title)}
+        </option>
       {/each}
       {#if store.subpath}
         <option value={EXTERNAL_TRACK}>{basename(store.subpath)}</option>
@@ -107,6 +131,11 @@ function basename(p: string): string {
       📂
     </button>
   </div>
+  {#if imageSubtitle}
+    <p class="warning">
+      The selected subtitle is an image track and will be burned with the overlay filter when enabled.
+    </p>
+  {/if}
 
   {#each validation?.errors.video ?? [] as e (e.field + e.message)}
     <p class="error">{e.field}: {e.message}</p>

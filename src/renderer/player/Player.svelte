@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { MediaInfo } from '../../engine/options';
 import type { PlayerBackend } from './backend';
+import type { PlayerTrackSelection } from './backend';
 import Controls from './Controls.svelte';
 import CropOverlay from './CropOverlay.svelte';
 import type { CropRect, VideoRect } from './math';
@@ -21,6 +22,7 @@ interface Props {
   disabled?: boolean;
   // yadif deinterlace toggle; kept in sync with the libmpv video chain.
   deinterlace?: boolean;
+  trackSelection?: PlayerTrackSelection | null;
 }
 const {
   src,
@@ -32,6 +34,7 @@ const {
   crop = null,
   disabled = false,
   deinterlace = false,
+  trackSelection = null,
 }: Props = $props();
 
 const backend: PlayerBackend = createPlayerBackend();
@@ -78,6 +81,11 @@ $effect(() => {
   backend.setDeinterlace(deinterlace);
 });
 
+$effect(() => {
+  if (!src || !probe || !trackSelection) return;
+  backend.setTracks(trackSelection);
+});
+
 // Loads the source and wires backend time into local state.
 $effect(() => {
   let off: (() => void) | null = null;
@@ -110,8 +118,14 @@ $effect(() => {
   };
 });
 
+const selectedVideo = $derived.by(() => {
+  const tracks = probe?.vtracks ?? [];
+  const id = trackSelection?.videoId;
+  return tracks.find((track) => track.id === id) ?? tracks[0] ?? null;
+});
+
 const _vr = $derived.by<VideoRect | null>(() => {
-  const v = probe?.vtracks[0];
+  const v = selectedVideo;
   if (!v?.width || !v.height || videoW === 0 || videoH === 0) return null;
   const { dw, dh } = sarDisplay(v.width, v.height, v.sar ?? 1);
   return letterbox(videoW, videoH, dw, dh, v.width);
@@ -178,6 +192,7 @@ function toggleFullscreen(): void {
 function _onKeydown(e: KeyboardEvent): void {
   if (disabled || e.target instanceof HTMLInputElement) return;
   switch (e.key) {
+    case 'Enter':
     case ' ':
       e.preventDefault();
       togglePlay();
@@ -225,6 +240,11 @@ function _onWheel(e: WheelEvent): void {
   backend.frameStep(e.deltaY < 0 ? 1 : -1);
 }
 
+function onVideoClick(): void {
+  videoEl?.focus();
+  if (!disabled) togglePlay();
+}
+
 function onFullscreenChange(): void {
   fullscreen = document.fullscreenElement !== null;
   // Fullscreen changes the geometry, so the crop overlay is stale.
@@ -244,18 +264,24 @@ function _onCropChange(c: CropRect | null): void {
 }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="player"
   bind:this={containerEl}
-  tabindex="0"
   role="application"
   aria-label="video player"
-  onkeydown={_onKeydown}
 >
-  <div class="video" bind:this={videoEl} onclick={() => { if (!disabled) togglePlay(); }} onwheel={_onWheel}>
-    {#if _vr && probe?.vtracks[0]}
-      {@const vtrack = probe.vtracks[0]}
+  <div
+    class="video"
+    bind:this={videoEl}
+    role="button"
+    tabindex="0"
+    aria-label="toggle video playback"
+    onclick={onVideoClick}
+    onkeydown={_onKeydown}
+    onwheel={_onWheel}
+  >
+    {#if _vr && selectedVideo}
+      {@const vtrack = selectedVideo}
       <CropOverlay
         vr={_vr}
         vwidth={vtrack.width ?? 0}

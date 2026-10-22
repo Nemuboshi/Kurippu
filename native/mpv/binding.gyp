@@ -9,12 +9,12 @@
       "cflags_cc": ["-std=c++17"],
       "defines": ["NAPI_DISABLE_CPP_EXCEPTIONS"],
       "conditions": [
-        ["OS=='mac' and target_arch=='arm64'", {
+        ["OS=='mac'", {
           "include_dirs": [
-            "<!(node -p \"process.env.MPV_INCLUDE_DIR || '/opt/homebrew/include'\")"
+            "<!(node -p \"process.env.MPV_INCLUDE_DIR || (process.arch === 'arm64' ? '/opt/homebrew/include' : '/usr/local/include')\")"
           ],
           "libraries": [
-            "<!(node -p \"process.env.MPV_LIB || '/opt/homebrew/lib/libmpv.dylib'\")",
+            "<!(node -p \"process.env.MPV_LIB || (process.arch === 'arm64' ? '/opt/homebrew/lib/libmpv.dylib' : '/usr/local/lib/libmpv.dylib')\")",
             "-framework OpenGL",
             "-framework IOSurface",
             "-framework CoreFoundation"
@@ -42,6 +42,16 @@
               "ExceptionHandling": 0
             }
           }
+        }],
+        ["OS=='linux'", {
+          "include_dirs": [
+            "<!(node -p \"process.env.MPV_INCLUDE_DIR || '/usr/include'\")"
+          ],
+          "libraries": [
+            "<!(node -p \"process.env.MPV_LIB || (process.arch === 'x64' ? '/usr/lib/x86_64-linux-gnu/libmpv.so' : '/usr/lib/libmpv.so')\")",
+            "-ldl",
+            "-lpthread"
+          ]
         }]
       ]
     }

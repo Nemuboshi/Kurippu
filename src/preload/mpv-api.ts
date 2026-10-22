@@ -2,6 +2,7 @@ import * as electron from 'electron';
 import type {
   ElectronMpvVideoApi,
   MpvPlayerSession,
+  MpvTrackKind,
   PlayerCreateOptions,
   PlayerEvent,
   PlayerFrame,
@@ -68,6 +69,13 @@ function createPlayerSession(id: string): MpvPlayerSession {
       electron.ipcRenderer.invoke(channel('player:seek'), id, seconds),
     setVolume: (value: number) =>
       electron.ipcRenderer.invoke(channel('player:set-volume'), id, value),
+    setTrack: (kind: MpvTrackKind, trackId: number | null) =>
+      electron.ipcRenderer.invoke(
+        channel('player:set-track'),
+        id,
+        kind,
+        trackId,
+      ),
     getProperty: (name: string) =>
       electron.ipcRenderer.invoke(channel('player:get-property'), id, name),
     setDeinterlace: (on: boolean) =>
@@ -171,6 +179,7 @@ export function exposeMpvApi() {
 export type {
   ElectronMpvVideoApi,
   MpvPlayerSession,
+  MpvTrackKind,
   PlayerCreateOptions,
   PlayerEvent,
   PlayerFrame,

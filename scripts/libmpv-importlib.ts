@@ -5,7 +5,7 @@
 // binding.gyp links against. This script derives mpv.lib from the exported
 // symbol table of the runtime DLL instead, so the same dev archive works.
 //
-// Usage: pnpm tsx scripts/libmpv-importlib.ts
+// Usage: pnpm libmpv:importlib
 // Requires the Visual Studio C++ build tools (dumpbin.exe + lib.exe).
 import { execFileSync } from 'node:child_process';
 import {

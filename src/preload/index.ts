@@ -14,14 +14,14 @@ const api = {
   resolveFfmpeg: (): Promise<string | null> => ipcRenderer.invoke('bin:ffmpeg'),
   resolveYtDlp: (): Promise<string | null> => ipcRenderer.invoke('bin:ytdlp'),
   runProcess: (
-    bin: string,
+    tool: 'ffmpeg' | 'yt-dlp',
     args: string[],
   ): Promise<{
     id: number;
     code: number | null;
     signal: string | null;
     stdout: string;
-  }> => ipcRenderer.invoke('proc:run', bin, args),
+  }> => ipcRenderer.invoke('proc:run', tool, args),
   killProcess: (id: number): Promise<void> =>
     ipcRenderer.invoke('proc:kill', id),
   onProcessStart: (cb: (id: number) => void): (() => void) => {
@@ -39,10 +39,6 @@ const api = {
     return () => ipcRenderer.removeListener('proc:log', listener);
   },
 
-  registerTempFile: (path: string): Promise<void> =>
-    ipcRenderer.invoke('temp:register', path),
-  unregisterTempFile: (path: string): Promise<void> =>
-    ipcRenderer.invoke('temp:unregister', path),
   makeTempPath: (ext: string): Promise<string> =>
     ipcRenderer.invoke('temp:makePath', ext),
   writeText: (path: string, text: string): Promise<void> =>

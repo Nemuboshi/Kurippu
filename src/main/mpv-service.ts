@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from 'electron';
 import * as electron from 'electron';
-import type { RenderPipeline } from '../shared/mpv-types.js';
+import type { MpvTrackKind, RenderPipeline } from '../shared/mpv-types.js';
 
 const CHANNEL_PREFIX = 'kurippu:mpv:v1';
 const channel = (name: string) => `${CHANNEL_PREFIX}:${name}`;
@@ -14,6 +14,7 @@ const IPC_CHANNELS = [
   'player:stop',
   'player:seek',
   'player:set-volume',
+  'player:set-track',
   'player:set-deinterlace',
   'player:get-property',
   'player:set-render-size',
@@ -42,6 +43,7 @@ type NativePlayer = {
   stop(): void;
   seek(seconds: number): void;
   setVolume(value: number): void;
+  setTrack(kind: MpvTrackKind, id: number | null): void;
   getProperty(name: string): Promise<unknown>;
   setDeinterlace(on: boolean): void;
   setUpdateCallback(callback?: () => void): void;
@@ -51,7 +53,6 @@ type NativePlayer = {
     width: number,
     height: number,
   ): Electron.SharedTextureImportTextureInfo;
-  getProperty(name: string): Promise<unknown>;
   pollEvents(): NativeEvent[];
   destroy(): void;
 };
@@ -89,9 +90,10 @@ function supportsSharedTexturePipeline() {
   );
 }
 
-// The main bundle ships under out/main, so native/ is two levels up from here
-// in both the source tree and a packaged app layout.
-function defaultAddonPath() {
+function defaultAddonPath(): string {
+  if (electron.app.isPackaged) {
+    return path.join(process.resourcesPath, 'native', 'mpv', 'mpv_addon.node');
+  }
   return path.join(
     import.meta.dirname,
     '..',
@@ -152,6 +154,20 @@ function normalizeSource(value: unknown) {
   return value;
 }
 
+function normalizeTrackKind(value: unknown): MpvTrackKind {
+  if (value === 'video' || value === 'audio' || value === 'subtitle')
+    return value;
+  throw new TypeError(`Unsupported track kind: ${String(value)}`);
+}
+
+function normalizeTrackId(value: unknown): number | null {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError('Track id must be a non-negative integer or null');
+  }
+  return value;
+}
+
 class PlayerSession {
   readonly id = randomUUID();
   private player: NativePlayer;
@@ -169,6 +185,7 @@ class PlayerSession {
   private volume = 100;
   private paused = true;
   private stopped = true;
+  private readonly selectedTracks = new Map<MpvTrackKind, number | null>();
 
   constructor(
     private readonly window: BrowserWindow,
@@ -200,6 +217,7 @@ class PlayerSession {
     this.assertAlive();
     this.player.open(source);
     this.source = source;
+    this.selectedTracks.clear();
     this.currentTime = 0;
     this.stopped = false;
     this.queueFrame();
@@ -243,6 +261,12 @@ class PlayerSession {
     this.volume = nextVolume;
   }
 
+  setTrack(kind: MpvTrackKind, id: number | null) {
+    this.assertAlive();
+    this.player.setTrack(kind, id);
+    this.selectedTracks.set(kind, id);
+  }
+
   getProperty(name: string): Promise<unknown> {
     this.assertAlive();
     return this.player.getProperty(name);
@@ -281,6 +305,8 @@ class PlayerSession {
       if (this.source && !this.stopped) {
         replacement.open(this.source);
         restoredEvents = await this.waitForFileLoaded(replacement);
+        for (const [kind, id] of this.selectedTracks)
+          replacement.setTrack(kind, id);
         if (this.currentTime > 0) replacement.seek(this.currentTime);
         if (this.paused) replacement.pause();
         else replacement.play();
@@ -375,7 +401,8 @@ class PlayerSession {
   private async renderOneFrame() {
     if (this.destroyed || this.window.isDestroyed()) return;
     if (this.pipeline === 'shared-texture') {
-      if (!electron.sharedTexture) {
+      const sharedTexture = electron.sharedTexture;
+      if (!sharedTexture) {
         throw new Error(
           'Electron sharedTexture API is not available in this runtime',
         );
@@ -389,23 +416,26 @@ class PlayerSession {
           this.renderSize.width,
           this.renderSize.height,
         );
+        let resolveReferences: (() => void) | null = null;
         const referencesReleased = new Promise<void>((resolve) => {
-          imported = electron.sharedTexture!.importSharedTexture({
-            textureInfo,
-            allReferencesReleased: () => {
-              this.sharedTextureFrameInFlight = false;
-              resolve();
-            },
-          });
+          resolveReferences = resolve;
         });
-        await electron.sharedTexture.sendSharedTexture(
+        const importedTexture = sharedTexture.importSharedTexture({
+          textureInfo,
+          allReferencesReleased: () => {
+            this.sharedTextureFrameInFlight = false;
+            resolveReferences?.();
+          },
+        });
+        imported = importedTexture;
+        await sharedTexture.sendSharedTexture(
           {
             frame: this.window.webContents.mainFrame,
-            importedSharedTexture: imported!,
+            importedSharedTexture: importedTexture,
           },
           this.id,
         );
-        imported!.release();
+        importedTexture.release();
         await referencesReleased;
       } catch (error) {
         this.sharedTextureFrameInFlight = false;
@@ -661,6 +691,14 @@ class MpvMainService implements MpvMain {
       async (event, id, value) =>
         this.getOwnedSession(event, id).setVolume(
           finiteNumber(value, 'volume'),
+        ),
+    );
+    electron.ipcMain.handle(
+      channel('player:set-track'),
+      async (event, id, kind, trackId) =>
+        this.getOwnedSession(event, id).setTrack(
+          normalizeTrackKind(kind),
+          normalizeTrackId(trackId),
         ),
     );
     electron.ipcMain.handle(

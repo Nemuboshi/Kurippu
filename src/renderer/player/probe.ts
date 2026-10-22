@@ -1,12 +1,16 @@
 import type { MediaInfo, TrackInfo } from '../../engine/options';
 
 interface MpvTrack {
+  id?: number;
   type?: string;
   codec?: string;
   lang?: string;
+  title?: string;
+  selected?: boolean;
   'demux-w'?: number;
   'demux-h'?: number;
   'demux-par'?: number;
+  'demux-fps'?: number;
   'container-fps'?: number;
   'demux-channel-count'?: number;
   'demux-samplerate'?: number;
@@ -17,16 +21,19 @@ interface MpvTrack {
 
 function trackInfo(track: MpvTrack): TrackInfo {
   return {
+    id: track.id,
     codec: track.codec ?? 'unknown',
     width: track['demux-w'],
     height: track['demux-h'],
     sar: track['demux-par'],
-    fps: track['container-fps'],
+    fps: track['demux-fps'] ?? track['container-fps'],
     lang: track.lang,
     channels: track['demux-channel-count'],
     sampleRate: track['demux-samplerate'],
     bitrate: track['demux-bitrate'],
     profile: track.profile,
+    selected: track.selected,
+    title: track.title,
   };
 }
 

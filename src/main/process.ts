@@ -10,7 +10,7 @@ export interface RunHandle {
 }
 
 let nextId = 1;
-const running = new Map<number, ChildProcess>();
+const running = new Map<number, { proc: ChildProcess; ownerId: number }>();
 
 export interface RunResult {
   code: number | null;
@@ -25,7 +25,7 @@ export function runProcess(
 ): { id: number; done: Promise<RunResult> } {
   const id = nextId++;
   const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-  running.set(id, proc);
+  running.set(id, { proc, ownerId: sender.id });
   // The invocation only resolves when the process exits, so the id is
   // pushed separately; the renderer needs it to cancel a running process.
   if (!sender.isDestroyed()) sender.send('proc:start', id);
@@ -49,10 +49,15 @@ export function runProcess(
 }
 
 // SIGKILL everywhere; we never wait for graceful exits.
-export function killProcess(id: number): void {
-  running.get(id)?.kill('SIGKILL');
+export function killProcess(sender: WebContents, id: number): void {
+  const runningProcess = running.get(id);
+  if (!runningProcess) return;
+  if (runningProcess.ownerId !== sender.id) {
+    throw new Error('Process does not belong to the IPC sender');
+  }
+  runningProcess.proc.kill('SIGKILL');
 }
 
 export function killAll(): void {
-  for (const proc of running.values()) proc.kill('SIGKILL');
+  for (const { proc } of running.values()) proc.kill('SIGKILL');
 }

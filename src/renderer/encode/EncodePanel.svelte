@@ -2,7 +2,13 @@
 import type { MediaInfo } from '../../engine/options';
 import { baseName, outputFileName } from '../../engine/output';
 import type { Source } from '../state';
-import { encoding, openFolder, openOutput, startEncode } from './runner.svelte';
+import {
+  cancelEncode,
+  encoding,
+  openFolder,
+  openOutput,
+  startEncode,
+} from './runner.svelte';
 
 interface Props {
   source: Source;
@@ -31,13 +37,14 @@ const {
 const api = window.kurippu;
 let previewText = $state('');
 let preview = $state<{ path: string; time: number | null } | null>(null);
-let title = $state(source.title ?? baseName(source));
+let title = $state('');
+let titleSource: Source | null = null;
 let outpath = $state('');
 let progress = $state(0);
 let logText = $state('');
 let lastOutput = $state<string | null>(null);
 let menu = $state<{ x: number; y: number } | null>(null);
-let logEl: HTMLPreElement;
+let logEl: HTMLTextAreaElement;
 let initializedDir = $state('');
 function join(dir: string, file: string): string {
   return `${dir.replace(/[\\/]+$/, '')}/${file}`;
@@ -56,6 +63,11 @@ async function nextPath(): Promise<void> {
 $effect(() => {
   if (defaultDir && initializedDir !== defaultDir) void nextPath();
 });
+$effect(() => {
+  if (titleSource === source) return;
+  titleSource = source;
+  title = source.title ?? baseName(source);
+});
 function log(line: string): void {
   const bottom =
     !logEl || logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4;
@@ -66,6 +78,10 @@ function log(line: string): void {
     });
 }
 function run(kind: 'test' | 'normal'): void {
+  if (encoding.current) {
+    void cancelEncode();
+    return;
+  }
   if (!valid) {
     log('Fix invalid parameters.');
     return;
@@ -147,12 +163,14 @@ function copyLog(): void {
       : logText,
   );
 }
+function closeMenu(event: MouseEvent): void {
+  if (event.target === event.currentTarget) menu = null;
+}
 </script>
 <div class="encode">
  <div class="inputs"><label>preview<input readonly value={previewText} title="Click to clear" disabled={encoding.current} onclick={clearPreview}/></label><button title="Use current player time" disabled={encoding.current} onclick={onClock}>🕐</button><button title="Pick image" disabled={encoding.current} onclick={()=>void onPreviewFile()}>📂</button><label>title<input bind:value={title} disabled={encoding.current}/></label><label class="grow">path<input bind:value={outpath} disabled={encoding.current}/></label><button title="Choose output file" disabled={encoding.current} onclick={()=>void onBrowse()}>📂</button></div>
  <div class="actions"><button disabled={!valid&&!encoding.current} onclick={()=>void run('test')}>{encoding.current?'cancel':'test'}</button><button disabled={!valid&&!encoding.current} onclick={()=>void run('normal')}>{encoding.current?'cancel':'normal'}</button><button disabled={lastOutput==null} onclick={()=>{if(lastOutput)void openOutput(lastOutput);}} oncontextmenu={(e)=>{e.preventDefault();if(lastOutput)void openFolder(lastOutput);}}>open</button><progress value={progress} max="100"></progress></div>
- <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
- <pre class="log" tabindex="0" bind:this={logEl} onkeydown={(e)=>{if(e.ctrlKey&&e.key==='c'){e.preventDefault();copyLog();}}} oncontextmenu={(e)=>{e.preventDefault();menu={x:e.clientX,y:e.clientY};}}>{logText}</pre>
- {#if menu}<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions --><div class="backdrop" onclick={()=>{menu=null;}}><div class="menu" style="left:{menu.x}px;top:{menu.y}px" onclick={(e)=>e.stopPropagation()}><button onclick={()=>{logText='';menu=null;}}>Clear</button><button onclick={()=>{copyLog();menu=null;}}>Copy</button><button onclick={()=>{selectLog();menu=null;}}>Select all</button></div></div>{/if}
+ <textarea class="log" readonly aria-label="encode log" wrap="off" bind:value={logText} bind:this={logEl} onkeydown={(e)=>{if(e.ctrlKey&&e.key==='c'){e.preventDefault();copyLog();}}} oncontextmenu={(e)=>{e.preventDefault();menu={x:e.clientX,y:e.clientY};}}></textarea>
+ {#if menu}<dialog open class="backdrop" aria-label="Log actions" onclick={closeMenu}><div class="menu" style="left:{menu.x}px;top:{menu.y}px"><button onclick={()=>{logText='';menu=null;}}>Clear</button><button onclick={()=>{copyLog();menu=null;}}>Copy</button><button onclick={()=>{selectLog();menu=null;}}>Select all</button></div></dialog>{/if}
 </div>
 <style>.encode{display:flex;flex-direction:column;gap:8px;height:100%;padding:8px;box-sizing:border-box}.inputs{display:flex;align-items:flex-end;gap:6px}.inputs label{display:flex;flex-direction:column;font-size:12px;color:#555}.inputs .grow{flex:1}.actions{display:flex;gap:8px;align-items:center}.actions button{width:90px;height:32px}.actions progress{flex:1;height:32px}.log{flex:1;margin:0;padding:6px;overflow:auto;font:12px monospace;background:#f8f8f8;white-space:pre-wrap;word-break:break-all}.backdrop{position:fixed;inset:0;z-index:10}.menu{position:fixed;display:flex;flex-direction:column;background:#fff;border:1px solid #999}.menu button{padding:6px 18px}</style>

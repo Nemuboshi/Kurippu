@@ -1,6 +1,6 @@
 import type { MediaInfo } from '../../engine/options';
-import type { MpvVideoState } from '../../shared/mpv-types';
-import type { PlayerBackend } from './backend';
+import type { MpvTrackKind, MpvVideoState } from '../../shared/mpv-types';
+import type { PlayerBackend, PlayerTrackSelection } from './backend';
 import type { MpvVideoElement } from './mpv-video';
 import { probeMpvSession } from './probe';
 
@@ -60,6 +60,17 @@ class MpvBackend implements PlayerBackend {
   }
   setMuted(muted: boolean): void {
     void this.element?.setVolume(muted ? 0 : this.volume);
+  }
+  setTracks(selection: PlayerTrackSelection): void {
+    const tasks: Promise<void>[] = [
+      this.setTrack('video', selection.videoId),
+      this.setTrack('audio', selection.audioId),
+      this.setTrack('subtitle', selection.subtitleId),
+    ];
+    void Promise.all(tasks).catch(() => undefined);
+  }
+  private setTrack(kind: MpvTrackKind, id: number | null): Promise<void> {
+    return this.element?.setTrack(kind, id) ?? Promise.resolve();
   }
   setDeinterlace(on: boolean): void {
     void this.element?.setDeinterlace(on);

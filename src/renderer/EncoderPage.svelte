@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { MediaInfo } from '../engine/options';
+import { isTextSubtitleCodec, type MediaInfo } from '../engine/options';
 import { showTime } from '../engine/time';
 import EncodePanel from './encode/EncodePanel.svelte';
 import { encoding } from './encode/runner.svelte';
@@ -10,6 +10,7 @@ import { EncoderStore } from './encoder/store.svelte';
 import VideoFx from './encoder/VideoFx.svelte';
 import type { CropRect } from './player/math';
 import Player from './player/Player.svelte';
+import type { PlayerTrackSelection } from './player/backend';
 import type { Source } from './state';
 
 interface Props {
@@ -38,6 +39,44 @@ function onCrop(crop: CropRect | null): void {
   store.cropx = String(crop.x);
   store.cropy = String(crop.y);
 }
+
+function trackIndex(value: string): number | null {
+  const index = Number(value);
+  return Number.isSafeInteger(index) && index >= 0 ? index : null;
+}
+
+function subtitleKind(codec: string): string {
+  return isTextSubtitleCodec(codec) ? 'text' : 'image';
+}
+
+const trackSelection = $derived.by<PlayerTrackSelection | null>(() => {
+  const media = store.media;
+  if (!media) return null;
+
+  const videoIndex = trackIndex(store.vtrack);
+  const video = videoIndex == null ? undefined : media.vtracks[videoIndex];
+  if (video?.id == null) return null;
+
+  const audioIndex = store.hasAudio ? trackIndex(store.atrack) : null;
+  const audio = audioIndex == null ? undefined : media.atracks[audioIndex];
+  const subtitleIndex =
+    store.subpath === '' ? trackIndex(store.strack) : null;
+  const subtitle =
+    subtitleIndex == null ? undefined : media.stracks[subtitleIndex];
+
+  return {
+    videoId: video.id,
+    audioId: audio?.id ?? null,
+    subtitleId: subtitle?.id ?? null,
+  };
+});
+const selectedVideo = $derived.by(() => {
+  const media = store.media;
+  const index = media ? trackIndex(store.vtrack) : null;
+  return index == null
+    ? media?.vtracks[0]
+    : (media?.vtracks[index] ?? media?.vtracks[0]);
+});
 const crop = $derived.by<CropRect | null>(() => {
   const values = [store.cropw, store.croph, store.cropx, store.cropy].map(
     Number,
@@ -54,7 +93,7 @@ const MIN_TABS_HEIGHT = 150;
 const MIN_PLAYER_HEIGHT = 120;
 let tabsHeight = $state(INITIAL_TABS_HEIGHT);
 let encoderEl: HTMLDivElement | undefined = $state();
-let dragging = false;
+let dragging = $state(false);
 
 function startDrag(event: PointerEvent): void {
   if (encoding.current) return;
@@ -86,7 +125,7 @@ $effect(() => {
 
 <div class="encoder" bind:this={encoderEl}>
   <button class="change" disabled={encoding.current} onclick={onChangeSource}>open another source</button>
-  <div class="player-pane"><Player src={source.path} {crop} disabled={encoding.current} deinterlace={store.deinterlace} {onCrop} onProbe={onProbe} onTime={(t) => { currentTime = t; }} onMarkStart={(t) => store.markStart(t)} onMarkEnd={(t) => store.markEnd(t)} /></div>
+  <div class="player-pane"><Player src={source.path} {crop} disabled={encoding.current} deinterlace={store.deinterlace} {trackSelection} {onCrop} onProbe={onProbe} onTime={(t) => { currentTime = t; }} onMarkStart={(t) => store.markStart(t)} onMarkEnd={(t) => store.markEnd(t)} /></div>
   <div class="divider" class:dragging role="separator" aria-orientation="horizontal" aria-label="Resize player and panels" onpointerdown={startDrag}></div>
   <div class="tabs-pane" style="height:{tabsHeight}px"><SubTabs {store} disabled={encoding.current}>
     {#snippet info()}<dl class="info">
@@ -98,14 +137,14 @@ $effect(() => {
       <dt>format</dt><dd>{store.media?.format ?? '—'}</dd>
       {#each store.media?.vtracks ?? [] as t, i}<dt>video #{i}</dt><dd>{t.codec}, {t.width}x{t.height}, SAR {t.sar ?? 1}, {t.fps ?? '?'} fps</dd>{/each}
       {#each store.media?.atracks ?? [] as t, i}<dt>audio #{i}</dt><dd>{t.codec}, {t.channels ?? '?'} channels, {t.sampleRate ?? '?'} Hz, {t.lang ?? 'unknown'}</dd>{/each}
-      {#each store.media?.stracks ?? [] as t, i}<dt>subtitle #{i}</dt><dd>{t.codec}, {t.lang ?? 'unknown'}</dd>{/each}
+      {#each store.media?.stracks ?? [] as t, i}<dt>subtitle #{i}</dt><dd>{t.codec} ({subtitleKind(t.codec)}), {t.lang ?? 'unknown'}{t.title ? `, ${t.title}` : ''}</dd>{/each}
     </dl>{/snippet}
     {#snippet video()}<VideoFx {store} />{/snippet}
     {#snippet audio()}<AudioFx {store} />{/snippet}
     {#snippet codecs()}<Codecs {store} />{/snippet}
-    {#snippet encode()}<EncodePanel {source} rawArgs={store.rawArgs} valid={store.derived?.allValid ?? false} twoPass={store.mode2Pass} container={store.derived?.container ?? 'mp4'} duration={store.derived?.duration ?? 0} avgFrameRate={String(store.media?.vtracks[0]?.fps ?? 25)} defaultDir={desktopDir} {currentTime} media={store.media} />{/snippet}
+    {#snippet encode()}<EncodePanel {source} rawArgs={store.rawArgs} valid={store.derived?.allValid ?? false} twoPass={store.mode2Pass} container={store.derived?.container ?? 'mp4'} duration={store.derived?.duration ?? 0} avgFrameRate={String(selectedVideo?.fps ?? 25)} defaultDir={desktopDir} {currentTime} media={store.media} />{/snippet}
   </SubTabs></div>
 </div>
 <style>
-.encoder{display:flex;flex-direction:column;height:100%;min-height:0;position:relative}.change{position:absolute;z-index:4;top:5px;left:5px}.player-pane{flex:1;min-height:0;min-width:0}.divider{flex:none;height:6px;cursor:ns-resize;border-top:1px solid #ddd;background:#f4f4f4}.divider:hover,.divider.dragging{background:#e0e0e0}.divider.dragging{background:#ffd54f}.tabs-pane{flex:none;min-height:0;overflow:auto;border-top:1px solid #ddd}.info{display:grid;grid-template-columns:max-content 1fr;gap:4px 10px;margin:0;padding:10px;font-size:13px}.info dt{color:#777}.info dd{margin:0;word-break:break-all}.path{all:unset;color:#1565c0;cursor:pointer}
+.encoder{display:flex;flex-direction:column;height:100%;min-height:0;position:relative}.change{position:absolute;z-index:4;top:5px;left:5px}.player-pane{flex:1 1 auto;min-height:120px;min-width:0}.divider{flex:none;height:6px;cursor:ns-resize;border-top:1px solid #ddd;background:#f4f4f4}.divider:hover,.divider.dragging{background:#e0e0e0}.divider.dragging{background:#ffd54f}.tabs-pane{flex:0 1 auto;min-height:150px;max-height:calc(100% - 126px);overflow:auto;border-top:1px solid #ddd}.info{display:grid;grid-template-columns:max-content 1fr;gap:4px 10px;margin:0;padding:10px;font-size:13px}.info dt{color:#777}.info dd{margin:0;word-break:break-all}.path{all:unset;color:#1565c0;cursor:pointer}
 </style>
