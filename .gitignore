@@ -5,12 +5,11 @@ node_modules/
 dist/
 out/
 bin/
+obj/
 .pi/
 .vitest/
 native/mpv/build/
-avalonia/**/bin/
-avalonia/**/obj/
-avalonia/publish/
-avalonia/extracted/
-avalonia/scripts/__pycache__/
+publish/
+extracted/
+scripts/__pycache__/
 .superpowers/

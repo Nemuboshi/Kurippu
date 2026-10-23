@@ -1,4 +1,4 @@
-name: Avalonia
+name: CI
 
 on:
   push:
@@ -34,28 +34,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libmpv-dev patchelf xvfb
       - name: Restore and test
-        run: dotnet test avalonia/Kurippu.slnx -c Release
+        run: dotnet test Kurippu.slnx -c Release
       - name: Packaging script tests
-        run: python -m unittest discover -s avalonia/scripts -p 'test_*.py'
+        run: python -m unittest discover -s scripts -p 'test_*.py'
       - name: Publish
-        run: dotnet publish avalonia/Kurippu.Desktop/Kurippu.Desktop.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o avalonia/publish/${{ matrix.rid }}
+        run: dotnet publish Kurippu.Desktop/Kurippu.Desktop.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o publish/${{ matrix.rid }}
       - name: Stage native runtime
-        run: python avalonia/scripts/stage_runtime.py ${{ matrix.rid }} avalonia/publish/${{ matrix.rid }}
+        run: python scripts/stage_runtime.py ${{ matrix.rid }} publish/${{ matrix.rid }}
       - name: Measure and package
         shell: bash
         run: |
-          du -sh avalonia/publish/${{ matrix.rid }}
-          cd avalonia/publish
+          du -sh publish/${{ matrix.rid }}
+          cd publish
           tar -czf ../../kurippu-${{ matrix.rid }}.tar.gz ${{ matrix.rid }}
           ls -lh ../../kurippu-${{ matrix.rid }}.tar.gz
           cd ../..
-          mkdir -p avalonia/extracted
-          tar -xzf kurippu-${{ matrix.rid }}.tar.gz -C avalonia/extracted
+          mkdir -p extracted
+          tar -xzf kurippu-${{ matrix.rid }}.tar.gz -C extracted
       - name: Extracted artifact smoke (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $app = (Resolve-Path 'avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop.exe').Path
+          $app = (Resolve-Path 'extracted/${{ matrix.rid }}/Kurippu.Desktop.exe').Path
           $process = Start-Process -FilePath $app -ArgumentList '--smoke' -Wait -PassThru -WindowStyle Hidden
           if ($process.ExitCode -ne 0) { exit $process.ExitCode }
           $process = Start-Process -FilePath $app -ArgumentList '--ui-smoke' -Wait -PassThru -WindowStyle Hidden
@@ -65,16 +65,16 @@ jobs:
       - name: Extracted artifact smoke (macOS)
         if: runner.os == 'macOS'
         run: |
-          avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --smoke
-          avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-smoke
-          avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-open-smoke
+          extracted/${{ matrix.rid }}/Kurippu.Desktop --smoke
+          extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-smoke
+          extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-open-smoke
       - name: Extracted artifact smoke (Linux)
         if: runner.os == 'Linux'
         run: |
-          xvfb-run -a avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --smoke
-          xvfb-run -a avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-smoke
-          xvfb-run -a avalonia/extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-open-smoke
+          xvfb-run -a extracted/${{ matrix.rid }}/Kurippu.Desktop --smoke
+          xvfb-run -a extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-smoke
+          xvfb-run -a extracted/${{ matrix.rid }}/Kurippu.Desktop --ui-open-smoke
       - uses: actions/upload-artifact@v4
         with:
-          name: kurippu-avalonia-${{ matrix.rid }}
+          name: kurippu-${{ matrix.rid }}
           path: kurippu-${{ matrix.rid }}.tar.gz
