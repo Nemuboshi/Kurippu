@@ -25,12 +25,13 @@ public sealed class RuntimeAssetCatalogTests
     }
 
     [Theory]
-    [InlineData("osx-x64", "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip",
-        "8d7917c1cebd7a29e68c0a0a6cc4ecc3fe05c7fffed958636c7018b319afdda4")]
+    [InlineData("osx-x64", "https://www.osxexperts.net/ffmpeg80intel.zip",
+        "2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07")]
     [InlineData("osx-arm64", "https://www.osxexperts.net/ffmpeg711arm.zip",
         "59e39a5cec2e5d2307ed079c53227a9181e64b87454ed4de998349e044bfdc70")]
-    [InlineData("linux-x64", "https://johnvansickle.com/ffmpeg/releases/ffmpeg-7.0.2-amd64-static.tar.xz",
-        "abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67")]
+    [InlineData("linux-x64",
+        "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2026-10-22-18-33/ffmpeg-N-127943-g2668cb6e31-linux64-gpl.tar.xz",
+        "500bd0fa35e13c8256ea4a3d29d3bacac1d78ec33370fa5d383bb468b4a5e544")]
     public void NonWindowsAssetsUseThePinnedArchives(string rid, string url, string sha256)
     {
         var asset = RuntimeAssetCatalog.Get(rid);
