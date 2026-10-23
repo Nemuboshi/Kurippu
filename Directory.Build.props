@@ -1,0 +1,15 @@
+<Project>
+
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer"
+                      Version="3.0.316"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

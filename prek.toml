@@ -1,0 +1,33 @@
+#:schema https://www.schemastore.org/prek.json
+
+default_install_hook_types = ["pre-commit", "commit-msg", "pre-push"]
+
+[[repos]]
+repo = "https://github.com/commitizen-tools/commitizen"
+rev = "v4.9.1"
+hooks = [
+  { id = "commitizen" },
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "dotnet-format",
+    name = "dotnet format",
+    language = "system",
+    entry = "dotnet format Kurippu.slnx",
+    stages = ["pre-commit"],
+    always_run = true,
+    pass_filenames = false,
+  },
+  {
+    id = "dotnet-analyzers",
+    name = ".NET analyzers and Meziantou.Analyzer",
+    language = "system",
+    entry = "dotnet format analyzers Kurippu.slnx --verify-no-changes",
+    stages = ["pre-push"],
+    always_run = true,
+    pass_filenames = false,
+  },
+]
