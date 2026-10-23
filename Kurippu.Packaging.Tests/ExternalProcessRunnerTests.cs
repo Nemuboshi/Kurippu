@@ -5,7 +5,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class ExternalProcessRunnerTests
 {
     [Fact]
-    public async Task Nonzero_process_exit_includes_stdout_and_stderr()
+    public async Task NonzeroProcessExitIncludesStdoutAndStderr()
     {
         var (fileName, arguments) = OperatingSystem.IsWindows()
             ? ("pwsh", new[]

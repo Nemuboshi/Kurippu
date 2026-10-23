@@ -24,8 +24,9 @@ public sealed class HttpAssetDownloader(HttpClient client) : IAssetDownloader
             await using (input.ConfigureAwait(false))
             {
                 using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-                await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write,
-                    FileShare.None, 131072, FileOptions.Asynchronous | FileOptions.SequentialScan))
+                var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write,
+                    FileShare.None, 131072, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                await using (output.ConfigureAwait(false))
                 {
                     var buffer = new byte[131072];
                     int read;

@@ -29,7 +29,8 @@ public sealed class ControlledDetectionRunner : IProcessRunner
     {
         Interlocked.Increment(ref calls);
         started.TrySetResult();
-        await release.Task.WaitAsync(ignoreCancellation ? CancellationToken.None : cancellationToken);
+        await release.Task.WaitAsync(ignoreCancellation ? CancellationToken.None : cancellationToken)
+            .ConfigureAwait(false);
         log?.Report(Output);
         completed.TrySetResult();
         return exitCode;

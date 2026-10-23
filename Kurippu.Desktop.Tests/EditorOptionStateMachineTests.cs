@@ -247,6 +247,12 @@ public class EditorOptionStateMachineTests
         public string? Validate(EditorViewModel editor)
         {
             var actual = editor.Options;
+            return ValidateMirroredState(actual, editor.CopyAvailable) ??
+                ValidateDerivedPlan(editor, actual);
+        }
+
+        private string? ValidateMirroredState(OptionInputs actual, bool copyAvailable)
+        {
             if (actual.CrfMode != CrfMode) return "CRF mode diverged";
             if (actual.LimitMode != LimitMode) return "limit mode diverged";
             if (actual.TwoPass != TwoPass) return "two-pass mode diverged";
@@ -263,10 +269,14 @@ public class EditorOptionStateMachineTests
             if (actual.CrfMode && actual.LimitMode) return "CRF and limit modes must be exclusive";
             if (actual.TwoPass && !actual.LimitMode) return "two-pass requires limit mode";
             if (actual.TwoPass && actual.CrfMode) return "two-pass requires non-CRF mode";
-            if (string.Equals(actual.AudioCodec, "copy", StringComparison.Ordinal) && !editor.CopyAvailable)
+            if (string.Equals(actual.AudioCodec, "copy", StringComparison.Ordinal) && !copyAvailable)
                 return "copy selected for incompatible audio";
-            if (editor.CopyAvailable != CanCopyAudio) return "copy availability diverged";
+            if (copyAvailable != CanCopyAudio) return "copy availability diverged";
+            return null;
+        }
 
+        private static string? ValidateDerivedPlan(EditorViewModel editor, OptionInputs actual)
+        {
             var expected = OptionEngine.Derive(CopyInputs(actual), editor.Media);
             if (editor.Plan.IsValid != expected.IsValid) return "plan validity is stale";
             if (!editor.Plan.Errors.SequenceEqual(expected.Errors)) return "plan errors are stale";

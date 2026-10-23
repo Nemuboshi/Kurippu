@@ -11,12 +11,12 @@ public class MpvIntegrationTests
         if (string.IsNullOrWhiteSpace(path)) return;
         using var player = new MpvPlayer();
         var media = await player.OpenAsync(path, TestContext.Current.CancellationToken);
-        Assert.True(media.Width == 320, $"width={media.Width}, video-params/w={player.Property("video-params/w")}, " +
-            $"track-list/0/demux-w={player.Property("track-list/0/demux-w")}, track-list/0/type={player.Property("track-list/0/type")}");
+        Assert.True(media.Width == 320, $"width={media.Width}, video-params/w={player.GetProperty("video-params/w")}, " +
+            $"track-list/0/demux-w={player.GetProperty("track-list/0/demux-w")}, track-list/0/type={player.GetProperty("track-list/0/type")}");
         Assert.Equal(180, media.Height);
         player.Play();
         player.SetMuted(true);
-        Assert.Equal("yes", player.Property("mute"));
+        Assert.Equal("yes", player.GetProperty("mute"));
         player.SetMuted(false);
         player.FrameBackStep();
         await Task.Delay(200, TestContext.Current.CancellationToken);

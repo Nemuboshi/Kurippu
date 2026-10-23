@@ -933,7 +933,7 @@ public class EncodeLifecycleHeadlessTests
     private static async Task<bool> WaitUntilAsync(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(10);
+        while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(10).ConfigureAwait(true);
         return condition();
     }
 }

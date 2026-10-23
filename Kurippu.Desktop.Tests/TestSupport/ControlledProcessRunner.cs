@@ -33,7 +33,7 @@ public sealed class ControlledProcessRunner : IProcessRunner
         log?.Report($"frame={call * 10}");
         firstProgressReported.TrySetResult();
         var release = call == 2 ? releaseSecondPass.Task : releaseFirstPass.Task;
-        await release.WaitAsync(cancellationToken);
+        await release.WaitAsync(cancellationToken).ConfigureAwait(false);
         finished.TrySetResult();
         return exitCode;
     }

@@ -8,7 +8,7 @@ public sealed class PackagingCommandTests
     [InlineData(new[] { "stage", "win-x64", "publish/win-x64" }, 0)]
     [InlineData(new[] { "stage", "bogus", "publish/win-x64" }, 2)]
     [InlineData(new[] { "unknown" }, 2)]
-    public void Run_returns_expected_exit_code(string[] args, int expected)
+    public void RunReturnsExpectedExitCode(string[] args, int expected)
     {
         var staging = new RecordingStager();
         var command = new PackagingCommand(staging);
@@ -20,7 +20,7 @@ public sealed class PackagingCommandTests
     }
 
     [Fact]
-    public void Run_rejects_missing_arguments_without_staging()
+    public void RunRejectsMissingArgumentsWithoutStaging()
     {
         var staging = new RecordingStager();
         var command = new PackagingCommand(staging);
@@ -32,7 +32,7 @@ public sealed class PackagingCommandTests
     }
 
     [Fact]
-    public async Task Stage_command_invokes_ffmpeg_staging_native_staging_and_cleanup()
+    public async Task StageCommandInvokesFfmpegStagingNativeStagingAndCleanup()
     {
         var directory = Path.Combine(Path.GetTempPath(), "kurippu-command-tests-" +
             Guid.NewGuid().ToString("N"));
@@ -60,7 +60,7 @@ public sealed class PackagingCommandTests
     }
 
     [Fact]
-    public async Task Stage_command_returns_two_for_an_unsupported_rid()
+    public async Task StageCommandReturnsTwoForAnUnsupportedRid()
     {
         var stager = new RecordingStager();
         var command = new PackagingCommand(stager, ReleaseSymbolCleaner.RemoveDebugSymbols);
@@ -73,7 +73,7 @@ public sealed class PackagingCommandTests
     }
 
     [Fact]
-    public async Task Stage_command_propagates_staging_failures()
+    public async Task StageCommandPropagatesStagingFailures()
     {
         var stager = new RecordingStager
         {

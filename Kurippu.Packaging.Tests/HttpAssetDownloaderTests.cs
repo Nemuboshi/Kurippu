@@ -8,7 +8,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class HttpAssetDownloaderTests
 {
     [Fact]
-    public async Task Matching_checksum_moves_the_archive_into_place()
+    public async Task MatchingChecksumMovesTheArchiveIntoPlace()
     {
         var content = Encoding.UTF8.GetBytes("verified payload");
         using var client = new HttpClient(new StubHandler(content));
@@ -31,7 +31,7 @@ public sealed class HttpAssetDownloaderTests
     }
 
     [Fact]
-    public async Task Mismatched_checksum_throws_and_leaves_no_archive()
+    public async Task MismatchedChecksumThrowsAndLeavesNoArchive()
     {
         using var client = new HttpClient(new StubHandler(Encoding.UTF8.GetBytes("payload")));
         var downloader = new HttpAssetDownloader(client);
@@ -55,7 +55,7 @@ public sealed class HttpAssetDownloaderTests
     }
 
     [Fact]
-    public async Task Cancellation_does_not_publish_a_partial_file()
+    public async Task CancellationDoesNotPublishAPartialFile()
     {
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();

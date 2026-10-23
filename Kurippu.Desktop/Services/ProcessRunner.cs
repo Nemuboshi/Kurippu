@@ -2,12 +2,6 @@ using System.Diagnostics;
 
 namespace Kurippu.Desktop.Services;
 
-public interface IProcessRunner
-{
-    Task<int> RunAsync(string executable, IReadOnlyList<string> args, IProgress<string>? log,
-        CancellationToken cancellationToken);
-}
-
 public sealed class ProcessRunner : IProcessRunner
 {
     public async Task<int> RunAsync(string executable, IReadOnlyList<string> args, IProgress<string>? log,
@@ -30,10 +24,11 @@ public sealed class ProcessRunner : IProcessRunner
         });
         async Task ReadLinesAsync(StreamReader reader)
         {
-            while (await reader.ReadLineAsync(CancellationToken.None) is { } line) log?.Report(line);
+            while (await reader.ReadLineAsync(CancellationToken.None).ConfigureAwait(false) is { } line)
+                log?.Report(line);
         }
         await Task.WhenAll(ReadLinesAsync(process.StandardOutput), ReadLinesAsync(process.StandardError),
-            process.WaitForExitAsync(CancellationToken.None));
+            process.WaitForExitAsync(CancellationToken.None)).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return process.ExitCode;
     }

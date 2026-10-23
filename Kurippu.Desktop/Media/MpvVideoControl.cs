@@ -18,7 +18,7 @@ public sealed class MpvVideoControl : Control, IDisposable
     private bool disposed;
     public IMediaPlayer? Player { get; set; }
     public bool HasFrame => hasFrame;
-    public event Action<double>? TimeChanged;
+    public event EventHandler<TimeChangedEventArgs>? TimeChanged;
 
     public MpvVideoControl()
     {
@@ -42,7 +42,7 @@ public sealed class MpvVideoControl : Control, IDisposable
         {
             var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
             var (width, height) = FrameSize.ForViewport(Bounds.Width, Bounds.Height, scale);
-            var pixels = await Task.Run(() => player.RenderFrame(width, height));
+            var pixels = await Task.Run(() => player.RenderFrame(width, height)).ConfigureAwait(true);
             if (disposed || Player != player) return;
             if (bitmap?.PixelSize != new PixelSize(width, height))
             {
@@ -58,20 +58,20 @@ public sealed class MpvVideoControl : Control, IDisposable
             }
             hasFrame = true;
             InvalidateVisual();
-            if (oversized) { oversized = false; RenderRecovered?.Invoke(); }
-            TimeChanged?.Invoke(player.Numeric("time-pos"));
+            if (oversized) { oversized = false; RenderRecovered?.Invoke(this, EventArgs.Empty); }
+            TimeChanged?.Invoke(this, new TimeChangedEventArgs(player.GetNumericProperty("time-pos")));
         }
         catch (ObjectDisposedException) { }
         catch (ArgumentOutOfRangeException ex) when (string.Equals(ex.ParamName, "width", StringComparison.Ordinal))
         {
-            if (!oversized) { oversized = true; RenderFailed?.Invoke(ex); }
+            if (!oversized) { oversized = true; RenderFailed?.Invoke(this, new RenderFailedEventArgs(ex)); }
         }
-        catch (Exception ex) { timer.Stop(); RenderFailed?.Invoke(ex); }
+        catch (Exception ex) { timer.Stop(); RenderFailed?.Invoke(this, new RenderFailedEventArgs(ex)); }
         finally { rendering = false; }
     }
 
-    public event Action<Exception>? RenderFailed;
-    public event Action? RenderRecovered;
+    public event EventHandler<RenderFailedEventArgs>? RenderFailed;
+    public event EventHandler? RenderRecovered;
 
     public void Dispose()
     {

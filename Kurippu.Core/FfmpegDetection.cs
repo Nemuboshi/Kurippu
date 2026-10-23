@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Kurippu.Core;
 
-public static class FfmpegDetection
+public static partial class FfmpegDetection
 {
     public static string[] InterlaceArgs(string path, double start, int track) => Build(path, start, track,
         "idet,metadata=print:lavfi.idet.multiple.tff:file=-", 10);
@@ -18,16 +18,26 @@ public static class FfmpegDetection
             "-f", "null", "-"];
 
     public static bool ParseInterlace(string output) =>
-        int.TryParse(Regex.Matches(output, @"lavfi\.idet\.multiple\.tff=(\d+)").LastOrDefault()?.Groups[1].Value,
-System.Globalization.CultureInfo.InvariantCulture, out var count) && count > 3;
+        int.TryParse(InterlaceCountRegex().Matches(output).LastOrDefault()?.Groups["count"].Value,
+            CultureInfo.InvariantCulture, out var count) && count > 3;
 
     public static CropRect? ParseCrop(string output)
     {
-        int? Last(string key) => int.TryParse(Regex.Matches(output, $@"lavfi\.cropdetect\.{key}=(-?\d+)")
-            .LastOrDefault()?.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var number) ? number : null;
+        int? Last(string key) => int.TryParse(CropValueRegex().Matches(output)
+                .Where(match => string.Equals(match.Groups["key"].Value, key, StringComparison.Ordinal))
+                .LastOrDefault()?.Groups["value"].Value,
+            CultureInfo.InvariantCulture, out var number) ? number : null;
         var w = Last("w"); var h = Last("h"); var x = Last("x"); var y = Last("y");
         return w is > 0 && h is > 0 && x is >= 0 && y is >= 0 ? new(w.Value, h.Value, x.Value, y.Value) : null;
     }
+
+    [GeneratedRegex(@"lavfi\.idet\.multiple\.tff=(?<count>\d+)",
+        RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex InterlaceCountRegex();
+
+    [GeneratedRegex(@"lavfi\.cropdetect\.(?<key>w|h|x|y)=(?<value>-?\d+)",
+        RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex CropValueRegex();
 
     public static bool IsFullFrame(CropRect crop, MediaInfo media, int trackIndex)
     {

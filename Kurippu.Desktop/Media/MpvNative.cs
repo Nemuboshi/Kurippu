@@ -43,13 +43,11 @@ public static class MpvNative
     [DllImport(Library, EntryPoint = "mpv_terminate_destroy", CallingConvention = CallingConvention.Cdecl)]
     internal static extern void TerminateDestroy(IntPtr handle);
     [DllImport(Library, EntryPoint = "mpv_set_option_string", CallingConvention = CallingConvention.Cdecl)]
-    internal static extern int SetOption(IntPtr handle, [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
+    internal static extern int SetOption(IntPtr handle, byte[] name, byte[] value);
     [DllImport(Library, EntryPoint = "mpv_set_property_string", CallingConvention = CallingConvention.Cdecl)]
-    internal static extern int SetProperty(IntPtr handle, [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
+    internal static extern int SetProperty(IntPtr handle, byte[] name, byte[] value);
     [DllImport(Library, EntryPoint = "mpv_get_property_string", CallingConvention = CallingConvention.Cdecl)]
-    internal static extern IntPtr GetProperty(IntPtr handle, [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+    internal static extern IntPtr GetProperty(IntPtr handle, byte[] name);
     [DllImport(Library, EntryPoint = "mpv_free", CallingConvention = CallingConvention.Cdecl)]
     internal static extern void Free(IntPtr pointer);
     [DllImport(Library, EntryPoint = "mpv_command", CallingConvention = CallingConvention.Cdecl)]

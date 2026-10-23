@@ -5,7 +5,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class LinuxNativeDependencyInspectorTests
 {
     [Fact]
-    public async Task Linux_inspector_parses_ldd_dependencies()
+    public async Task LinuxInspectorParsesLddDependencies()
     {
         var runner = new FakeProcessRunner(response: (_, _) => new ProcessResult(0,
             """
@@ -27,7 +27,7 @@ public sealed class LinuxNativeDependencyInspectorTests
     }
 
     [Fact]
-    public async Task Linux_inspector_rejects_missing_dependencies()
+    public async Task LinuxInspectorRejectsMissingDependencies()
     {
         var runner = new FakeProcessRunner(response: (_, _) => new ProcessResult(0,
             "libmissing.so.1 => not found", ""));

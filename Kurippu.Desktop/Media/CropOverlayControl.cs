@@ -15,8 +15,8 @@ public sealed class CropOverlayControl : Control
     public int SourceHeight { get; set; }
     public double Sar { get; set; } = 1;
     public CropRect? Crop { get; private set; }
-    public event Action<CropRect?>? CropChanged;
-    public event Action? Clicked;
+    public event EventHandler<CropChangedEventArgs>? CropChanged;
+    public event EventHandler? Clicked;
 
     public void SetCrop(CropRect? crop) { Crop = crop; InvalidateVisual(); }
     public void ApplyDetectedCrop(CropRect crop) => Commit(crop);
@@ -70,7 +70,7 @@ public sealed class CropOverlayControl : Control
         if (dragMode is null) return;
         var point = e.GetPosition(this);
         if (string.Equals(dragMode, "draw", StringComparison.Ordinal) && Math.Abs(point.X - origin.X) < 8 && Math.Abs(point.Y - origin.Y) < 8)
-            Clicked?.Invoke();
+            Clicked?.Invoke(this, EventArgs.Empty);
         dragMode = null;
         e.Pointer.Capture(null);
         e.Handled = true;
@@ -79,6 +79,6 @@ public sealed class CropOverlayControl : Control
     private void Commit(CropRect? crop)
     {
         SetCrop(crop);
-        CropChanged?.Invoke(crop);
+        CropChanged?.Invoke(this, new CropChangedEventArgs(crop));
     }
 }

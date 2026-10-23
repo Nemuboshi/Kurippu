@@ -6,12 +6,13 @@ public sealed class FakeAssetDownloader(
     IReadOnlyDictionary<string, string>? sources = null,
     Exception? failure = null) : IAssetDownloader
 {
-    public List<(Uri Source, string Destination, string Sha256)> Calls { get; } = [];
+    private readonly List<(Uri Source, string Destination, string Sha256)> calls = [];
+    public IReadOnlyList<(Uri Source, string Destination, string Sha256)> Calls => calls;
 
     public async Task DownloadAsync(Uri source, string destination, string sha256,
         CancellationToken cancellationToken)
     {
-        Calls.Add((source, destination, sha256));
+        calls.Add((source, destination, sha256));
         if (failure is not null) throw failure;
         if (sources is not null && sources.TryGetValue(source.AbsoluteUri, out var local))
             await CopyAsync(local, destination, cancellationToken).ConfigureAwait(false);
@@ -24,8 +25,9 @@ public sealed class FakeAssetDownloader(
         var input = File.OpenRead(source);
         await using (input.ConfigureAwait(false))
         {
-            await using var output = File.Create(destination);
-            await input.CopyToAsync(output, cancellationToken);
+            var output = File.Create(destination);
+            await using (output.ConfigureAwait(false))
+                await input.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
         }
     }
 }

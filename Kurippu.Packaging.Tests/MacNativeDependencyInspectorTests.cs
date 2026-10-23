@@ -5,7 +5,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class MacNativeDependencyInspectorTests
 {
     [Fact]
-    public async Task Mac_inspector_parses_otool_dependencies()
+    public async Task MacInspectorParsesOtoolDependencies()
     {
         var runner = new FakeProcessRunner(response: (_, _) => new ProcessResult(0,
             """

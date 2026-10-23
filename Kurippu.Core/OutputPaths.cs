@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace Kurippu.Core;
 
-public static class OutputPaths
+public static partial class OutputPaths
 {
     public static string? ExistingDirectory(string? outputPath, Func<string, bool> exists)
     {
@@ -13,7 +13,7 @@ public static class OutputPaths
     public static string NextAvailable(string directory, string sourceName, string container, Func<string, bool> exists)
     {
         var name = Path.GetFileNameWithoutExtension(sourceName);
-        name = Regex.Replace(name, @"(?:-\d+)+$", "");
+        name = TrailingNumberRegex().Replace(name, "");
         if (string.IsNullOrWhiteSpace(name)) name = "video";
         for (var index = 0; ; index++)
         {
@@ -21,4 +21,8 @@ public static class OutputPaths
             if (!exists(path)) return path;
         }
     }
+
+    [GeneratedRegex(@"(?:-\d+)+$", RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 1000)]
+    private static partial Regex TrailingNumberRegex();
 }

@@ -1,11 +1,18 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text;
 using Kurippu.Core;
 
 namespace Kurippu.Desktop.Media;
 
 public sealed class MpvPlayer : IMediaPlayer
 {
+    private static readonly string[] TrackPropertyNames =
+    [
+        "id", "type", "codec", "demux-w", "demux-h", "demux-par", "demux-fps",
+        "demux-channel-count", "demux-samplerate", "demux-bitrate", "profile", "lang", "title"
+    ];
+
     private readonly Lock gate = new();
     private IntPtr handle;
     private IntPtr renderer;
@@ -17,7 +24,7 @@ public sealed class MpvPlayer : IMediaPlayer
         if (handle == IntPtr.Zero) throw new InvalidOperationException("Could not create libmpv instance");
         try
         {
-            Check(MpvNative.SetOption(handle, "vo", "libmpv"), "set video output");
+            Check(MpvNative.SetOption(handle, Utf8("vo"), Utf8("libmpv")), "set video output");
             Check(MpvNative.Initialize(handle), "initialize libmpv");
             var api = Marshal.StringToCoTaskMemUTF8("sw");
             try
@@ -43,57 +50,63 @@ public sealed class MpvPlayer : IMediaPlayer
             {
                 timeout.Token.ThrowIfCancellationRequested();
                 int eventId;
-                lock (gate) { ThrowIfDisposed(); eventId = Marshal.ReadInt32(MpvNative.WaitEvent(handle, 0)); }
+                lock (gate)
+                {
+                    ThrowIfDisposed();
+                    var eventPointer = MpvNative.WaitEvent(handle, 0);
+                    eventId = eventPointer == IntPtr.Zero ? 0 : Marshal.ReadInt32(eventPointer);
+                }
                 if (eventId == 7) throw new InvalidDataException("libmpv could not open the media file");
                 if (eventId == 8)
                 {
-                    var count = Integer("track-list/count");
+                    var count = GetIntegerProperty("track-list/count");
                     var values = new Dictionary<string, string>(StringComparer.Ordinal)
                     {
-                        ["duration"] = Property("duration"),
+                        ["duration"] = GetProperty("duration"),
                         ["track-list/count"] = count.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                        ["media-title"] = Property("media-title"),
-                        ["file-format"] = Property("file-format"),
-                        ["file-size"] = Property("file-size"),
-                        ["demuxer-bitrate"] = Property("demuxer-bitrate")
+                        ["media-title"] = GetProperty("media-title"),
+                        ["file-format"] = GetProperty("file-format"),
+                        ["file-size"] = GetProperty("file-size"),
+                        ["demuxer-bitrate"] = GetProperty("demuxer-bitrate")
                     };
-                    for (var i = 0; i < count; i++)
+                    foreach (var key in TrackPropertyNames)
                     {
-                        var prefix = $"track-list/{i}/";
-                        foreach (var key in new[] { "id", "type", "codec", "demux-w", "demux-h", "demux-par",
-                            "demux-fps", "demux-channel-count", "demux-samplerate", "demux-bitrate",
-                            "profile", "lang", "title" })
-                            values[prefix + key] = Property(prefix + key);
+                        for (var i = 0; i < count; i++)
+                        {
+                            var prefix = $"track-list/{i}/";
+                            values[prefix + key] = GetProperty(prefix + key);
+                        }
                     }
-                    values["video-params/w"] = Property("video-params/w");
-                    values["video-params/h"] = Property("video-params/h");
-                    values["video-params/par"] = Property("video-params/par");
+                    values["video-params/w"] = GetProperty("video-params/w");
+                    values["video-params/h"] = GetProperty("video-params/h");
+                    values["video-params/par"] = GetProperty("video-params/par");
                     return MediaProbe.FromProperties(path, values);
                 }
-                await Task.Delay(60, timeout.Token);
+                await Task.Delay(60, timeout.Token).ConfigureAwait(true);
             }
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException("Timed out while loading media");
+            throw new TimeoutException("Timed out while loading media", ex);
         }
     }
 
-    public string Property(string name)
+    public string GetProperty(string name)
     {
         lock (gate)
         {
             ThrowIfDisposed();
-            var value = MpvNative.GetProperty(handle, name);
+            var value = MpvNative.GetProperty(handle, Utf8(name));
             if (value == IntPtr.Zero) return "";
             try { return Marshal.PtrToStringUTF8(value) ?? ""; }
             finally { MpvNative.Free(value); }
         }
     }
 
-    public double Numeric(string name) => double.TryParse(Property(name), NumberStyles.Float,
+    public double GetNumericProperty(string name) => double.TryParse(GetProperty(name), NumberStyles.Float,
         CultureInfo.InvariantCulture, out var value) ? value : 0;
-    public int Integer(string name) => int.TryParse(Property(name), System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : 0;
+    public int GetIntegerProperty(string name) => int.TryParse(GetProperty(name),
+        CultureInfo.InvariantCulture, out var value) ? value : 0;
     public void Play() => Set("pause", "no");
     public void Pause() => Set("pause", "yes");
     public void Seek(double seconds) => Command("seek", seconds.ToString("0.###", CultureInfo.InvariantCulture), "absolute");
@@ -101,7 +114,13 @@ public sealed class MpvPlayer : IMediaPlayer
     public void FrameBackStep() => Command("frame-back-step");
     public void SetVolume(double volume) => Set("volume", Math.Clamp(volume, 0, 100).ToString(CultureInfo.InvariantCulture));
     public void SetMuted(bool muted) => Set("mute", muted ? "yes" : "no");
-    public void SetTrack(string kind, int? id) => Set(kind, id?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "no");
+    public void SetTrack(TrackKind kind, int? id) => Set(kind switch
+    {
+        TrackKind.Video => "vid",
+        TrackKind.Audio => "aid",
+        TrackKind.Subtitle => "sid",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    }, id?.ToString(CultureInfo.InvariantCulture) ?? "no");
     public void SetDeinterlace(bool value) => Set("deinterlace", value ? "yes" : "no");
 
     public byte[] RenderFrame(int width, int height)
@@ -143,8 +162,14 @@ public sealed class MpvPlayer : IMediaPlayer
 
     private void Set(string name, string value)
     {
-        lock (gate) { ThrowIfDisposed(); Check(MpvNative.SetProperty(handle, name, value), $"set {name}"); }
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            Check(MpvNative.SetProperty(handle, Utf8(name), Utf8(value)), $"set {name}");
+        }
     }
+
+    private static byte[] Utf8(string value) => Encoding.UTF8.GetBytes(value + '\0');
 
     private void Command(params string[] arguments)
     {
@@ -174,7 +199,7 @@ public sealed class MpvPlayer : IMediaPlayer
 
     private void ThrowIfDisposed()
     {
-        if (disposed) throw new ObjectDisposedException(nameof(MpvPlayer));
+        ObjectDisposedException.ThrowIf(disposed, this);
     }
 
     public void Dispose()

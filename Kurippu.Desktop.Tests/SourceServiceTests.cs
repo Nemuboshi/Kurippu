@@ -28,8 +28,8 @@ public class SourceServiceTests
         var runner = new Runner("""{"title":"Clip","webpage_url":"https://example.org/video","formats":[{"format_id":"v1","vcodec":"vp9","acodec":"none","height":1080},{"format_id":"a1","vcodec":"none","acodec":"opus","abr":128}]}""");
         var source = await new SourceService(runner, "yt-dlp", null).ResolveAsync("https://example.org/video", CancellationToken.None);
         Assert.Equal("v1", source.Videos.Single().Id);
-        Assert.Equal("a1", source.Audios.First().Id);
-        Assert.Equal("none", source.Audios.Last().Id);
+        Assert.Equal("a1", source.Audios[0].Id);
+        Assert.Equal("none", source.Audios[^1].Id);
         Assert.Contains("--dump-json", runner.Calls[0], StringComparer.Ordinal);
     }
 

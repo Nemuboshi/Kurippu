@@ -20,10 +20,13 @@ public partial class LogWindow : Window
 
     public string DisplayedText => LogText.Text ?? "";
 
-    private async void OnCopy(object? sender, RoutedEventArgs e)
+    private void OnCopy(object? sender, RoutedEventArgs e) => _ = CopyAsync();
+
+    private async Task CopyAsync()
     {
         var text = string.IsNullOrEmpty(LogText.SelectedText) ? LogText.Text : LogText.SelectedText;
-        if (text is not null && Clipboard is not null) await Clipboard.SetTextAsync(text);
+        if (text is not null && Clipboard is not null)
+            await Clipboard.SetTextAsync(text).ConfigureAwait(true);
     }
 
     private void OnSelectAll(object? sender, RoutedEventArgs e) => LogText.SelectAll();

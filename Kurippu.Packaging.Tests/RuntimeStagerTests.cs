@@ -6,7 +6,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class RuntimeStagerTests
 {
     [Fact]
-    public async Task Windows_stages_ffmpeg_and_libmpv_dlls()
+    public async Task WindowsStagesFfmpegAndLibmpvDlls()
     {
         using var fixture = new StagerFixture();
         fixture.CreateWindowsArchives();
@@ -24,7 +24,7 @@ public sealed class RuntimeStagerTests
     }
 
     [Fact]
-    public async Task Missing_libmpv_2_dll_is_an_error()
+    public async Task MissingLibmpv2DllIsAnError()
     {
         using var fixture = new StagerFixture();
         fixture.CreateWindowsArchives(includeMpvLibrary: false);
@@ -37,7 +37,7 @@ public sealed class RuntimeStagerTests
     }
 
     [Fact]
-    public async Task Nonzero_ffmpeg_version_check_is_an_error()
+    public async Task NonzeroFfmpegVersionCheckIsAnError()
     {
         if (!OperatingSystem.IsLinux()) return;
         using var fixture = new StagerFixture();

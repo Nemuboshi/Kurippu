@@ -9,14 +9,29 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
     {
         var output = Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(output);
-        var prefix = (await RunRequired("brew", ["--prefix"], cancellationToken).ConfigureAwait(false))
-            .Trim();
-        var mpvPrefix = (await RunRequired("brew", ["--prefix", "mpv"], cancellationToken).ConfigureAwait(false))
-            .Trim();
+        var source = await FindMacMpvAsync(cancellationToken).ConfigureAwait(false);
+        var staged = await StageMacDependenciesAsync(source, output, cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var target in staged.Values)
+            await RunRequired("codesign", ["--force", "--sign", "-", target],
+                cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<string> FindMacMpvAsync(CancellationToken cancellationToken)
+    {
+        var mpvPrefix = (await RunRequired("brew", ["--prefix", "mpv"], cancellationToken)
+            .ConfigureAwait(false)).Trim();
         var source = Path.Combine(mpvPrefix, "lib", "libmpv.dylib");
         if (!File.Exists(source))
             throw new PackagingException($"macOS mpv library was not found: {source}");
+        return source;
+    }
 
+    private async Task<Dictionary<string, string>> StageMacDependenciesAsync(string source,
+        string output, CancellationToken cancellationToken)
+    {
+        var prefix = (await RunRequired("brew", ["--prefix"], cancellationToken)
+            .ConfigureAwait(false)).Trim();
         var inspector = new MacNativeDependencyInspector(processRunner);
         var staged = new Dictionary<string, string>(StringComparer.Ordinal);
         var prefixRoot = Path.GetFullPath(prefix);
@@ -72,8 +87,7 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
         }
 
         await VisitAsync(source).ConfigureAwait(false);
-        foreach (var target in staged.Values)
-            await RunRequired("codesign", ["--force", "--sign", "-", target], cancellationToken).ConfigureAwait(false);
+        return staged;
     }
 
     public async Task StageLinuxAsync(string outputDirectory,
@@ -81,11 +95,7 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
     {
         var output = Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(output);
-        var source = sourceOverride ?? new[]
-        {
-            "/usr/lib/x86_64-linux-gnu/libmpv.so",
-            "/usr/lib/x86_64-linux-gnu/libmpv.so.2"
-        }.FirstOrDefault(File.Exists)
+        var source = sourceOverride ?? LinuxLibraryCandidates.FirstOrDefault(File.Exists)
             ?? throw new PackagingException("libmpv.so was not found on this Linux host.");
 
         var inspector = new LinuxNativeDependencyInspector(processRunner);
@@ -134,6 +144,12 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
     }
 
     [GeneratedRegex(@"^(?:libc|libm|libdl|libpthread|librt|ld-linux).*\.so",
-        RegexOptions.CultureInvariant)]
+        RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex IgnoredLinuxDependency();
+
+    private static readonly string[] LinuxLibraryCandidates =
+    [
+        "/usr/lib/x86_64-linux-gnu/libmpv.so",
+        "/usr/lib/x86_64-linux-gnu/libmpv.so.2"
+    ];
 }

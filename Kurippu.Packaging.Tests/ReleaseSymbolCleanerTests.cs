@@ -5,7 +5,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class ReleaseSymbolCleanerTests
 {
     [Fact]
-    public void Release_cleanup_removes_pdb_but_keeps_runtime_files()
+    public void ReleaseCleanupRemovesPdbButKeepsRuntimeFiles()
     {
         var directory = Path.Combine(Path.GetTempPath(), "kurippu-symbol-tests-" +
             Guid.NewGuid().ToString("N"));

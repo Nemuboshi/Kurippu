@@ -1,8 +1,9 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace Kurippu.Core;
 
-public static class FfmpegArguments
+public static partial class FfmpegArguments
 {
     public static string FormatRaw(IReadOnlyList<string> args) => string.Join(' ', args.Select(arg =>
         arg.Length == 0 || arg.Any(char.IsWhiteSpace) || arg.Contains('"') || arg.Contains('\\') || arg.Contains('\'')
@@ -42,80 +43,129 @@ public static class FfmpegArguments
 
     public static string[] Build(EncodeOptions o)
     {
-        if (string.IsNullOrWhiteSpace(o.InputPath)) throw new ArgumentException("Input path is required");
-        if (o.VideoCodec is not ("x264" or "vp8" or "vp9" or "av1")) throw new ArgumentException("Unsupported video codec");
-        if (o.AudioCodec is not ("aac" or "opus" or "vorbis" or "copy")) throw new ArgumentException("Unsupported audio codec");
+        if (string.IsNullOrWhiteSpace(o.InputPath))
+            throw new ArgumentException("Input path is required", nameof(o));
+        if (o.VideoCodec is not ("x264" or "vp8" or "vp9" or "av1"))
+            throw new ArgumentException("Unsupported video codec", nameof(o));
+        if (o.AudioCodec is not ("aac" or "opus" or "vorbis" or "copy"))
+            throw new ArgumentException("Unsupported audio codec", nameof(o));
         var a = new List<string>();
         if (o.Start is { } start) a.AddRange(["-ss", Number(start)]);
         a.AddRange(["-i", FileArg(o.InputPath)]);
         if (o.Start is not null && o.HasAudio && string.Equals(o.AudioCodec, "copy", StringComparison.Ordinal)) a.AddRange(["-ss", "0"]);
         if (o.End is { } end) a.AddRange(["-t", Number(end - (o.Start ?? 0))]);
-        var graphic = o.BurnSubtitles && o.GraphicSubtitles && o.SubtitleTrack is not null;
-        var filters = VideoFilters(o);
-        if (graphic)
-        {
-            var graph = $"[0:v:{o.VideoTrack}][0:s:{o.SubtitleTrack}]overlay";
-            if (filters.Count > 0) graph += "," + string.Join(',', filters);
-            a.AddRange(["-filter_complex", graph + "[v]", "-map", "[v]"]);
-        }
-        else a.AddRange(["-map", $"0:v:{o.VideoTrack}"]);
-        if (o.HasAudio) a.AddRange(["-map", $"0:a:{o.AudioTrack}"]);
-        a.AddRange(["-threads", o.Threads.ToString(CultureInfo.InvariantCulture)]);
-        switch (o.VideoCodec)
-        {
-            case "av1":
-                a.AddRange(["-c:v", "libaom-av1", "-cpu-used", string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "4"]);
-                if (!string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal))
-                {
-                    var tiles = (int)Math.Ceiling(Math.Log2(Math.Max(1, o.Threads)) / 2);
-                    var cols = Math.Min(tiles, (int)Math.Floor(Math.Log2(Math.Max(1, (o.FinalWidth + 63) / 64.0))));
-                    var rows = Math.Min(tiles, (int)Math.Floor(Math.Log2(Math.Max(1, (o.FinalHeight + 63) / 64.0))));
-                    a.AddRange(["-tile-columns", cols.ToString(System.Globalization.CultureInfo.InvariantCulture), "-tile-rows", rows.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
-                }
-                if (string.Equals(o.Multithreading, "row-mt", StringComparison.Ordinal)) a.AddRange(["-row-mt", "1"]);
-                a.AddRange(["-strict", "experimental"]);
-                break;
-            case "vp9":
-                a.AddRange(["-c:v", "libvpx-vp9", "-speed", string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "1",
-                    "-tile-columns", string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "6"]);
-                if (string.Equals(o.Multithreading, "row-mt", StringComparison.Ordinal)) a.AddRange(["-row-mt", "1"]);
-                a.AddRange(["-frame-parallel", "0"]);
-                break;
-            case "vp8": a.AddRange(["-c:v", "libvpx", "-speed", "0"]); break;
-            default: a.AddRange(["-c:v", "libx264"]); break;
-        }
-        a.AddRange(["-b:v", o.VideoBitrate is { } bitrate ? $"{bitrate}k" : "0"]);
-        if (o.Quality is { } quality)
-        {
-            a.AddRange(["-crf", quality.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
-            if (string.Equals(o.VideoCodec, "vp8", StringComparison.Ordinal) && quality < 4) a.AddRange(["-qmin", "0"]);
-            if (string.Equals(o.VideoCodec, "vp9", StringComparison.Ordinal) && quality == 0) a.AddRange(["-lossless", "1"]);
-        }
-        a.AddRange(["-preset", o.Preset]);
-        if (!string.Equals(o.VideoCodec, "x264", StringComparison.Ordinal)) a.AddRange(["-auto-alt-ref", "1", "-lag-in-frames", "25", "-g", "128"]);
-        a.AddRange(["-pix_fmt", "yuv420p"]);
-        if (!graphic && filters.Count > 0) a.AddRange(["-vf", string.Join(',', filters)]);
-        if (o.HasAudio)
-        {
-            if (string.Equals(o.AudioCodec, "copy", StringComparison.Ordinal)) a.AddRange(["-c:a", "copy"]);
-            else
-            {
-                switch (o.AudioCodec)
-                {
-                    case "opus": a.AddRange(["-c:a", "libopus", "-b:a", $"{Number(o.AudioBitrate ?? 128)}k"]); break;
-                    case "aac": a.AddRange(["-c:a", "aac", "-b:a", $"{Number(o.AudioBitrate ?? 128)}k"]); break;
-                    case "vorbis": a.AddRange(["-c:a", "libvorbis", "-q:a", Number(o.AudioBitrate ?? 4)]); break;
-                }
-                if (o.AudioChannels > 2) a.AddRange(["-ac", "2"]);
-                var audio = new List<string>();
-                if (o.Amplify is { } amp) audio.Add($"acompressor=makeup={Number(amp)}");
-                if (o.FadeIn is { } fadeIn) audio.Add($"afade=t=in:d={Number(fadeIn)}");
-                if (o.FadeOut is { } fadeOut) audio.Add($"afade=t=out:d={Number(fadeOut)}:st={(o.Duration - fadeOut).ToString("0.000", CultureInfo.InvariantCulture)}");
-                if (audio.Count > 0) a.AddRange(["-af", string.Join(',', audio)]);
-            }
-        }
+        AddMappings(a, o);
+        AddVideoArguments(a, o);
+        AddAudioArguments(a, o);
         a.AddRange(["-f", string.Equals(o.VideoCodec, "x264", StringComparison.Ordinal) ? "mp4" : "webm"]);
         return a.ToArray();
+    }
+
+    private static void AddMappings(List<string> arguments, EncodeOptions options)
+    {
+        var graphic = options.BurnSubtitles && options.GraphicSubtitles && options.SubtitleTrack is not null;
+        var filters = VideoFilters(options);
+        if (graphic)
+        {
+            var graph = $"[0:v:{options.VideoTrack}][0:s:{options.SubtitleTrack}]overlay";
+            if (filters.Count > 0) graph += "," + string.Join(',', filters);
+            arguments.AddRange(["-filter_complex", graph + "[v]", "-map", "[v]"]);
+        }
+        else arguments.AddRange(["-map", $"0:v:{options.VideoTrack}"]);
+        if (options.HasAudio) arguments.AddRange(["-map", $"0:a:{options.AudioTrack}"]);
+        arguments.AddRange(["-threads", options.Threads.ToString(CultureInfo.InvariantCulture)]);
+    }
+
+    private static void AddVideoArguments(List<string> arguments, EncodeOptions options)
+    {
+        switch (options.VideoCodec)
+        {
+            case "av1":
+                arguments.AddRange(["-c:v", "libaom-av1", "-cpu-used",
+                    string.Equals(options.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "4"]);
+                if (!string.Equals(options.Multithreading, "no-mt", StringComparison.Ordinal))
+                {
+                    var tiles = (int)Math.Ceiling(Math.Log2(Math.Max(1, options.Threads)) / 2);
+                    var cols = Math.Min(tiles,
+                        (int)Math.Floor(Math.Log2(Math.Max(1, (options.FinalWidth + 63) / 64.0))));
+                    var rows = Math.Min(tiles,
+                        (int)Math.Floor(Math.Log2(Math.Max(1, (options.FinalHeight + 63) / 64.0))));
+                    arguments.AddRange(["-tile-columns",
+                        cols.ToString(CultureInfo.InvariantCulture), "-tile-rows",
+                        rows.ToString(CultureInfo.InvariantCulture)]);
+                }
+                if (string.Equals(options.Multithreading, "row-mt", StringComparison.Ordinal))
+                    arguments.AddRange(["-row-mt", "1"]);
+                arguments.AddRange(["-strict", "experimental"]);
+                break;
+            case "vp9":
+                arguments.AddRange(["-c:v", "libvpx-vp9", "-speed",
+                    string.Equals(options.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "1",
+                    "-tile-columns",
+                    string.Equals(options.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "6"]);
+                if (string.Equals(options.Multithreading, "row-mt", StringComparison.Ordinal))
+                    arguments.AddRange(["-row-mt", "1"]);
+                arguments.AddRange(["-frame-parallel", "0"]);
+                break;
+            case "vp8":
+                arguments.AddRange(["-c:v", "libvpx", "-speed", "0"]);
+                break;
+            default:
+                arguments.AddRange(["-c:v", "libx264"]);
+                break;
+        }
+        arguments.AddRange(["-b:v", options.VideoBitrate is { } bitrate ? $"{bitrate}k" : "0"]);
+        if (options.Quality is { } quality)
+        {
+            arguments.AddRange(["-crf", quality.ToString(CultureInfo.InvariantCulture)]);
+            if (string.Equals(options.VideoCodec, "vp8", StringComparison.Ordinal) && quality < 4)
+                arguments.AddRange(["-qmin", "0"]);
+            if (string.Equals(options.VideoCodec, "vp9", StringComparison.Ordinal) && quality == 0)
+                arguments.AddRange(["-lossless", "1"]);
+        }
+        arguments.AddRange(["-preset", options.Preset]);
+        if (!string.Equals(options.VideoCodec, "x264", StringComparison.Ordinal))
+            arguments.AddRange(["-auto-alt-ref", "1", "-lag-in-frames", "25", "-g", "128"]);
+        arguments.AddRange(["-pix_fmt", "yuv420p"]);
+        var filters = VideoFilters(options);
+        if (filters.Count > 0 && !(options.BurnSubtitles && options.GraphicSubtitles &&
+                                   options.SubtitleTrack is not null))
+            arguments.AddRange(["-vf", string.Join(',', filters)]);
+    }
+
+    private static void AddAudioArguments(List<string> arguments, EncodeOptions options)
+    {
+        if (options.HasAudio)
+        {
+            if (string.Equals(options.AudioCodec, "copy", StringComparison.Ordinal))
+                arguments.AddRange(["-c:a", "copy"]);
+            else
+            {
+                switch (options.AudioCodec)
+                {
+                    case "opus":
+                        arguments.AddRange(["-c:a", "libopus", "-b:a",
+                            $"{Number(options.AudioBitrate ?? 128)}k"]);
+                        break;
+                    case "aac":
+                        arguments.AddRange(["-c:a", "aac", "-b:a",
+                            $"{Number(options.AudioBitrate ?? 128)}k"]);
+                        break;
+                    case "vorbis":
+                        arguments.AddRange(["-c:a", "libvorbis", "-q:a",
+                            Number(options.AudioBitrate ?? 4)]);
+                        break;
+                }
+                if (options.AudioChannels > 2) arguments.AddRange(["-ac", "2"]);
+                var audio = new List<string>();
+                if (options.Amplify is { } amp) audio.Add($"acompressor=makeup={Number(amp)}");
+                if (options.FadeIn is { } fadeIn) audio.Add($"afade=t=in:d={Number(fadeIn)}");
+                if (options.FadeOut is { } fadeOut)
+                    audio.Add($"afade=t=out:d={Number(fadeOut)}:st=" +
+                        $"{(options.Duration - fadeOut).ToString("0.000", CultureInfo.InvariantCulture)}");
+                if (audio.Count > 0) arguments.AddRange(["-af", string.Join(',', audio)]);
+            }
+        }
     }
 
     private static List<string> VideoFilters(EncodeOptions o)
@@ -185,7 +235,7 @@ public static class FfmpegArguments
         else if (args.IndexOf("-filter_complex") is var graphIndex && graphIndex >= 0)
         {
             var graph = args[graphIndex + 1];
-            var label = System.Text.RegularExpressions.Regex.Match(graph, @"(\[[^\]]+\])$");
+            var label = TrailingLabelRegex().Match(graph);
             args[graphIndex + 1] = label.Success
                 ? graph[..^label.Length] + "," + evenScale + label.Value
                 : graph + "," + evenScale;
@@ -194,6 +244,10 @@ public static class FfmpegArguments
         args.AddRange(["-f", "matroska", FileArg(output)]);
         return [.. Prefix, .. args];
     }
+
+    [GeneratedRegex(@"(?<label>\[[^\]]+\])$", RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 1000)]
+    private static partial Regex TrailingLabelRegex();
 
     public static string[] BuildPreview(string path, double? time, string codec, string format,
         string output, int width, int height, double sar, double fps)

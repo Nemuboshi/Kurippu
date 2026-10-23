@@ -3,7 +3,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class CiWorkflowTests
 {
     [Fact]
-    public void Ci_packages_with_csharp_target_and_archives_from_repository_root()
+    public void CiPackagesWithCsharpTargetAndArchivesFromRepositoryRoot()
     {
         var workflow = File.ReadAllText(FindRepositoryFile(".github", "workflows", "ci.yml"));
 

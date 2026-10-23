@@ -1,9 +1,5 @@
 namespace Kurippu.Packaging;
 
-public sealed record RuntimeAssetFile(string FileName, string Url, string Sha256);
-
-public sealed record RuntimeAsset(string Rid, string ReleaseUrl, RuntimeAssetFile Ffmpeg, RuntimeAssetFile? Mpv);
-
 public static class RuntimeAssetCatalog
 {
     private const string WindowsReleaseUrl =

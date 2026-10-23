@@ -2,23 +2,6 @@ using System.Text.Json;
 
 namespace Kurippu.Desktop.Services;
 
-public sealed record FormatChoice(string Id, string Label);
-public sealed record SourceChoices(string Url, string Title, IReadOnlyList<FormatChoice> Videos,
-    IReadOnlyList<FormatChoice> Audios, IReadOnlyList<FormatChoice> Subtitles, string? SaveAs = null)
-{
-    public int DefaultSubtitleIndex
-    {
-        get
-        {
-            for (var i = 0; i < Subtitles.Count; i++)
-                if (Subtitles[i].Id is "en" or "eng" or "en-US" or "en_US") return i;
-            for (var i = 0; i < Subtitles.Count; i++)
-                if (string.Equals(Subtitles[i].Id, "none", StringComparison.Ordinal)) return i;
-            return -1;
-        }
-    }
-}
-
 public sealed class SourceService(IProcessRunner runner, string ytDlp, string? ffmpeg) : IDisposable
 {
     private readonly HashSet<string> directories = [];
@@ -28,7 +11,7 @@ public sealed class SourceService(IProcessRunner runner, string ytDlp, string? f
         ValidateUrl(url);
         var lines = new List<string>();
         var result = await runner.RunAsync(ytDlp, ["--no-playlist", "--dump-json", "--write-subs", "--", url],
-            new InlineProgress(lines.Add), cancellationToken);
+            new InlineProgress(lines.Add), cancellationToken).ConfigureAwait(false);
         if (result != 0) throw new InvalidOperationException($"yt-dlp could not resolve URL ({result})");
         using var json = JsonDocument.Parse(lines.LastOrDefault(line => line.TrimStart().StartsWith('{'))
             ?? throw new InvalidDataException("yt-dlp did not return media information"));
@@ -73,7 +56,7 @@ string.Equals(audioId, "none", StringComparison.Ordinal) ? videoId : videoId + "
             if (ffmpeg is not null) args.AddRange(["--ffmpeg-location", ffmpeg]);
             if (!string.Equals(subtitleId, "none", StringComparison.Ordinal)) args.AddRange(["--sub-langs", subtitleId, "--write-subs", "--embed-subs"]);
             args.AddRange(["--output", output, "--", url]);
-            var result = await runner.RunAsync(ytDlp, args, log, cancellationToken);
+            var result = await runner.RunAsync(ytDlp, args, log, cancellationToken).ConfigureAwait(false);
             if (result != 0) throw new InvalidOperationException($"yt-dlp download failed ({result})");
             var file = Directory.GetFiles(directory).FirstOrDefault(path =>
                 Path.GetFileName(path).StartsWith("source.", StringComparison.Ordinal) &&

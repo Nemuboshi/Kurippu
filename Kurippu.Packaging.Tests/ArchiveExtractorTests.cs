@@ -7,7 +7,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class ArchiveExtractorTests
 {
     [Fact]
-    public void Extracts_zip_and_preserves_relative_paths()
+    public void ExtractsZipAndPreservesRelativePaths()
     {
         using var fixture = new ArchiveFixture("sample.zip");
         using (var zip = new ZipArchive(File.Create(fixture.Archive), ZipArchiveMode.Create))
@@ -23,7 +23,7 @@ public sealed class ArchiveExtractorTests
     }
 
     [Fact]
-    public void Extracts_tar_xz()
+    public void ExtractsTarXz()
     {
         using var fixture = new ArchiveFixture("sample.tar.xz");
         TestArchiveFactory.WriteEmbeddedTarXz(fixture.Archive, TestArchiveFactory.SampleTarXz);
@@ -38,7 +38,7 @@ public sealed class ArchiveExtractorTests
     [InlineData("../escape.txt")]
     [InlineData("nested/../../escape.txt")]
     [InlineData("/absolute.txt")]
-    public void Rejects_absolute_and_parent_traversal_entries(string name)
+    public void RejectsAbsoluteAndParentTraversalEntries(string name)
     {
         using var fixture = new ArchiveFixture("unsafe.zip");
         using (var zip = new ZipArchive(File.Create(fixture.Archive), ZipArchiveMode.Create))
@@ -56,7 +56,7 @@ public sealed class ArchiveExtractorTests
     }
 
     [Fact]
-    public void Rejects_symbolic_links()
+    public void RejectsSymbolicLinks()
     {
         using var fixture = new ArchiveFixture("unsafe.tar.xz");
         TestArchiveFactory.WriteEmbeddedTarXz(fixture.Archive, TestArchiveFactory.SymbolicLinkTarXz);
@@ -69,7 +69,7 @@ public sealed class ArchiveExtractorTests
     }
 
     [Fact]
-    public void Rejects_zip_symbolic_links()
+    public void RejectsZipSymbolicLinks()
     {
         using var fixture = new ArchiveFixture("unsafe.zip");
         using (var zip = new ZipArchive(File.Create(fixture.Archive), ZipArchiveMode.Create))
@@ -88,7 +88,7 @@ public sealed class ArchiveExtractorTests
     }
 
     [Fact]
-    public void Rejects_duplicate_entries_that_collide()
+    public void RejectsDuplicateEntriesThatCollide()
     {
         using var fixture = new ArchiveFixture("duplicate.zip");
         using (var zip = new ZipArchive(File.Create(fixture.Archive), ZipArchiveMode.Create))

@@ -6,7 +6,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class NativeDependencyStagerTests
 {
     [Fact]
-    public async Task Mac_stages_recursive_closure_and_rewrites_references()
+    public async Task MacStagesRecursiveClosureAndRewritesReferences()
     {
         using var fixture = new NativeFixture();
         var runner = fixture.CreateMacRunner();
@@ -27,7 +27,7 @@ public sealed class NativeDependencyStagerTests
     }
 
     [Fact]
-    public async Task Linux_stages_recursive_closure_and_ignores_system_runtime_libraries()
+    public async Task LinuxStagesRecursiveClosureAndIgnoresSystemRuntimeLibraries()
     {
         using var fixture = new NativeFixture();
         var runner = fixture.CreateLinuxRunner();
@@ -45,7 +45,7 @@ public sealed class NativeDependencyStagerTests
     }
 
     [Fact]
-    public async Task Mac_rid_on_a_non_mac_host_is_rejected_before_download()
+    public async Task MacRidOnANonMacHostIsRejectedBeforeDownload()
     {
         if (OperatingSystem.IsMacOS()) return;
         using var fixture = new NativeFixture();
@@ -61,7 +61,7 @@ public sealed class NativeDependencyStagerTests
     }
 
     [Fact]
-    public async Task Linux_rid_on_a_non_linux_host_is_rejected_before_download()
+    public async Task LinuxRidOnANonLinuxHostIsRejectedBeforeDownload()
     {
         if (OperatingSystem.IsLinux()) return;
         using var fixture = new NativeFixture();

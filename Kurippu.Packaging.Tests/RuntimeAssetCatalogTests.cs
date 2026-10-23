@@ -5,7 +5,7 @@ namespace Kurippu.Packaging.Tests;
 public sealed class RuntimeAssetCatalogTests
 {
     [Fact]
-    public void Catalog_contains_all_four_supported_rids()
+    public void CatalogContainsAllFourSupportedRids()
     {
         var rids = RuntimeAssetCatalog.All.Select(asset => asset.Rid).ToArray();
 
@@ -13,7 +13,7 @@ public sealed class RuntimeAssetCatalogTests
     }
 
     [Fact]
-    public void Windows_assets_use_the_pinned_release_and_hashes()
+    public void WindowsAssetsUseThePinnedReleaseAndHashes()
     {
         var asset = RuntimeAssetCatalog.Get("win-x64");
 
@@ -31,7 +31,7 @@ public sealed class RuntimeAssetCatalogTests
         "59e39a5cec2e5d2307ed079c53227a9181e64b87454ed4de998349e044bfdc70")]
     [InlineData("linux-x64", "https://johnvansickle.com/ffmpeg/releases/ffmpeg-7.0.2-amd64-static.tar.xz",
         "abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67")]
-    public void Non_windows_assets_use_the_pinned_archives(string rid, string url, string sha256)
+    public void NonWindowsAssetsUseThePinnedArchives(string rid, string url, string sha256)
     {
         var asset = RuntimeAssetCatalog.Get(rid);
 
@@ -41,7 +41,7 @@ public sealed class RuntimeAssetCatalogTests
     }
 
     [Fact]
-    public void Unsupported_rid_is_not_returned()
+    public void UnsupportedRidIsNotReturned()
     {
         Assert.Throws<PackagingException>(() => RuntimeAssetCatalog.Get("bogus"));
     }

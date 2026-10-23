@@ -5,8 +5,8 @@ namespace Kurippu.Desktop.Media;
 public interface IMediaPlayer : IDisposable
 {
     Task<MediaInfo> OpenAsync(string path, CancellationToken cancellationToken = default);
-    string Property(string name);
-    double Numeric(string name);
+    string GetProperty(string name);
+    double GetNumericProperty(string name);
     void Play();
     void Pause();
     void Seek(double seconds);
@@ -14,7 +14,7 @@ public interface IMediaPlayer : IDisposable
     void FrameBackStep();
     void SetVolume(double volume);
     void SetMuted(bool muted);
-    void SetTrack(string kind, int? id);
+    void SetTrack(TrackKind kind, int? id);
     void SetDeinterlace(bool value);
     byte[] RenderFrame(int width, int height);
 }

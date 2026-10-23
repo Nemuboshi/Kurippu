@@ -13,31 +13,15 @@ public static class RuntimeSmoke
         var video = Path.Combine(directory, "source.mp4");
         try
         {
-            var args = new[] { "-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i",
-                "testsrc=size=320x180:rate=25", "-t", "1", "-c:v", "mpeg4", video };
-            var exit = await new ProcessRunner().RunAsync(ffmpeg, args, null, CancellationToken.None);
-            if (exit != 0 || !File.Exists(video)) throw new InvalidOperationException("FFmpeg smoke encode failed");
+            await CreateFixtureAsync(ffmpeg, video, 1).ConfigureAwait(false);
             using var player = new MpvPlayer();
-            var media = await player.OpenAsync(video);
+            var media = await player.OpenAsync(video).ConfigureAwait(false);
             if (media.Width != 320 || media.Height != 180) throw new InvalidDataException("libmpv probe mismatch");
-            player.Play();
-            player.Seek(.5);
-            await Task.Delay(200);
-            var frame = player.RenderFrame(320, 180);
-            if (frame.Length != 320 * 180 * 4 || frame.All(value => value == 0))
-                throw new InvalidDataException("libmpv software frame is missing");
-            player.Pause();
-            player.SetMuted(true);
-            if (!string.Equals(player.Property("mute"), "yes", StringComparison.Ordinal)) throw new InvalidDataException("libmpv mute failed");
-            player.SetMuted(false);
-            player.FrameBackStep();
+            await VerifyPlaybackAsync(player).ConfigureAwait(false);
             var detectionVideo = Path.Combine(directory, "detect.mp4");
-            var detectArgs = new[] { "-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i",
-                "testsrc=size=320x180:rate=25", "-t", "7", "-c:v", "mpeg4", detectionVideo };
-            if (await new ProcessRunner().RunAsync(ffmpeg, detectArgs, null, CancellationToken.None) != 0)
-                throw new InvalidOperationException("Detection fixture encode failed");
+            await CreateFixtureAsync(ffmpeg, detectionVideo, 7).ConfigureAwait(false);
             var detected = await new DetectionService(new ProcessRunner(), ffmpeg).DetectCropAsync(
-                detectionVideo, 0, 0, CancellationToken.None);
+                detectionVideo, 0, 0, CancellationToken.None).ConfigureAwait(false);
             if (detected is null || detected.Width != 320 || detected.Height != 180)
                 throw new InvalidDataException("FFmpeg crop detection failed");
             var options = new EncodeOptions
@@ -51,33 +35,80 @@ public static class RuntimeSmoke
             };
             var output = Path.Combine(directory, "output.mp4");
             var encoder = new EncodeService(new ProcessRunner(), ffmpeg);
-            await encoder.EncodeAsync(options, output,
-                "smoke", false, false, null, CancellationToken.None);
-            if (!File.Exists(output) || new FileInfo(output).Length == 0)
-                throw new InvalidDataException("FFmpeg output is missing");
+            await VerifyEncodingAsync(encoder, options, output, video).ConfigureAwait(false);
             var test = Path.Combine(directory, "test.mkv");
-            await encoder.EncodeAsync(options, test, "smoke", false, true, null, CancellationToken.None);
+            await encoder.EncodeAsync(options, test, "smoke", false, true, null,
+                CancellationToken.None).ConfigureAwait(false);
             if (!File.Exists(test)) throw new InvalidDataException("Test output is missing");
-            var graphTest = Path.Combine(directory, "graph-test.mkv");
-            var graphArgs = FfmpegArguments.BuildTest(["-i", "file:" + video, "-i", "file:" + video,
-                "-filter_complex", "[0:v][1:v]overlay[v]", "-map", "[v]", "-c:v", "libx264",
-                "-f", "mp4"], graphTest);
-            if (await new ProcessRunner().RunAsync(ffmpeg, graphArgs, null, CancellationToken.None) != 0 ||
-                !File.Exists(graphTest)) throw new InvalidDataException("Complex filter test encode failed");
+            await VerifyGraphTestAsync(ffmpeg, video, directory).ConfigureAwait(false);
             var preview = Path.Combine(directory, "preview.mp4");
-            await encoder.EncodeAsync(options, preview, "smoke", false, false, null,
-                CancellationToken.None, new PreviewSource(video, .5, 320, 180, 1, 25));
-            if (!File.Exists(preview)) throw new InvalidDataException("Preview output is missing");
-            using (var previewPlayer = new MpvPlayer())
-            {
-                var previewInfo = await previewPlayer.OpenAsync(preview);
-                if (previewInfo.Duration < .8) throw new InvalidDataException("Preview concat omitted the main movie");
-            }
+            await VerifyPreviewAsync(encoder, options, video, preview).ConfigureAwait(false);
             var twoPass = Path.Combine(directory, "two-pass.mp4");
-            await encoder.EncodeAsync(options, twoPass, "smoke", true, false, null, CancellationToken.None);
+            await encoder.EncodeAsync(options, twoPass, "smoke", true, false, null,
+                CancellationToken.None).ConfigureAwait(false);
             if (!File.Exists(twoPass)) throw new InvalidDataException("Two-pass output is missing");
             Console.WriteLine("Kurippu runtime smoke passed");
         }
         finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    private static async Task CreateFixtureAsync(string ffmpeg, string output, int seconds)
+    {
+        var args = new[] { "-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i",
+            "testsrc=size=320x180:rate=25", "-t", seconds.ToString(
+                System.Globalization.CultureInfo.InvariantCulture), "-c:v", "mpeg4", output };
+        var exit = await new ProcessRunner().RunAsync(ffmpeg, args, null, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (exit != 0 || !File.Exists(output))
+            throw new InvalidOperationException("FFmpeg fixture encode failed");
+    }
+
+    private static async Task VerifyPlaybackAsync(MpvPlayer player)
+    {
+        player.Play();
+        player.Seek(.5);
+        await Task.Delay(200).ConfigureAwait(false);
+        var frame = player.RenderFrame(320, 180);
+        if (frame.Length != 320 * 180 * 4 || frame.All(value => value == 0))
+            throw new InvalidDataException("libmpv software frame is missing");
+        player.Pause();
+        player.SetMuted(true);
+        if (!string.Equals(player.GetProperty("mute"), "yes", StringComparison.Ordinal))
+            throw new InvalidDataException("libmpv mute failed");
+        player.SetMuted(false);
+        player.FrameBackStep();
+    }
+
+    private static async Task VerifyEncodingAsync(EncodeService encoder, EncodeOptions options,
+        string output, string source)
+    {
+        await encoder.EncodeAsync(options, output, "smoke", false, false, null,
+            CancellationToken.None).ConfigureAwait(false);
+        if (!File.Exists(output) || new FileInfo(output).Length == 0)
+            throw new InvalidDataException($"FFmpeg output is missing for {source}");
+    }
+
+    private static async Task VerifyGraphTestAsync(string ffmpeg, string source, string directory)
+    {
+        var output = Path.Combine(directory, "graph-test.mkv");
+        var args = FfmpegArguments.BuildTest(["-i", "file:" + source, "-i", "file:" + source,
+            "-filter_complex", "[0:v][1:v]overlay[v]", "-map", "[v]", "-c:v", "libx264",
+            "-f", "mp4"], output);
+        if (await new ProcessRunner().RunAsync(ffmpeg, args, null, CancellationToken.None)
+                .ConfigureAwait(false) != 0 || !File.Exists(output))
+            throw new InvalidDataException("Complex filter test encode failed");
+    }
+
+    private static async Task VerifyPreviewAsync(EncodeService encoder, EncodeOptions options,
+        string source, string output)
+    {
+        await encoder.EncodeAsync(options, output, "smoke", false, false, null,
+            CancellationToken.None, new PreviewSource(source, .5, 320, 180, 1, 25))
+            .ConfigureAwait(false);
+        if (!File.Exists(output)) throw new InvalidDataException("Preview output is missing");
+        using var player = new MpvPlayer();
+        var info = await player.OpenAsync(output).ConfigureAwait(false);
+        if (info.Duration < .8)
+            throw new InvalidDataException("Preview concat omitted the main movie");
     }
 }

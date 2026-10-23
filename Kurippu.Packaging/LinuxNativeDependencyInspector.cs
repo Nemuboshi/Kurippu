@@ -19,11 +19,11 @@ public sealed partial class LinuxNativeDependencyInspector(IProcessRunner proces
                 StringSplitOptions.RemoveEmptyEntries)
             .Select(line => DependencyRegex().Match(line))
             .Where(match => match.Success)
-            .Select(match => match.Groups[2].Value)
+            .Select(match => match.Groups["path"].Value)
             .ToArray();
     }
 
-    [GeneratedRegex(@"^\s+(\S+\.so(?:\.\d+)*)\s+=>\s+(.+?)(?:\s+\(0x[0-9a-fA-F]+\))?\s*$",
-        RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s+(?<library>\S+\.so(?:\.\d+)*)\s+=>\s+(?<path>.+?)(?:\s+\(0x[0-9a-fA-F]+\))?\s*$",
+        RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex DependencyRegex();
 }

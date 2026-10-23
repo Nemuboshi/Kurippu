@@ -21,22 +21,25 @@ public partial class App : Application
                 desktop.MainWindow.Opened += (_, _) =>
                     DispatcherTimer.RunOnce(() => desktop.MainWindow?.Close(), TimeSpan.FromSeconds(1));
             if (Program.UiOpenSmoke)
-                desktop.MainWindow.Opened += async (_, _) =>
-                {
-                    try
-                    {
-                        await ((MainWindow)desktop.MainWindow!).RunOpenSmokeAsync();
-                        Console.WriteLine("Kurippu UI open smoke passed");
-                        desktop.Shutdown(0);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.Error.WriteLine(ex);
-                        desktop.Shutdown(1);
-                    }
-                };
+                desktop.MainWindow.Opened += (_, _) =>
+                    _ = RunOpenSmokeAsync(desktop);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task RunOpenSmokeAsync(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        try
+        {
+            await ((MainWindow)desktop.MainWindow!).RunOpenSmokeAsync().ConfigureAwait(true);
+            Console.WriteLine("Kurippu UI open smoke passed");
+            desktop.Shutdown(0);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            desktop.Shutdown(1);
+        }
     }
 }

@@ -16,7 +16,7 @@ public sealed partial class MacNativeDependencyInspector(IProcessRunner processR
             .Skip(1)
             .Select(line => DependencyRegex().Match(line))
             .Where(match => match.Success)
-            .Select(match => match.Groups[1].Value)
+            .Select(match => match.Groups["library"].Value)
             .ToArray();
     }
 
@@ -26,6 +26,7 @@ public sealed partial class MacNativeDependencyInspector(IProcessRunner processR
             Environment.NewLine + result.StandardOutput + Environment.NewLine +
             result.StandardError);
 
-    [GeneratedRegex(@"^\s+(\S+)\s+\(", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s+(?<library>\S+)\s+\(", RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 1000)]
     private static partial Regex DependencyRegex();
 }
