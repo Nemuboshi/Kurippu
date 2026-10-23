@@ -11,7 +11,11 @@
     <Style Selector="TextBox"><Setter Property="Margin" Value="3"/><Setter Property="MinHeight" Value="34"/><Setter Property="CornerRadius" Value="6"/></Style>
     <Style Selector="ComboBox"><Setter Property="Margin" Value="3"/><Setter Property="MinHeight" Value="34"/></Style>
     <Style Selector="TabControl"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/></Style>
-    <Style Selector="TabItem"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="TabItem"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="FontSize" Value="14"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="Padding" Value="12,8"/></Style>
+    <Style Selector="TabItem:selected"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="#EditorPanel Button"><Setter Property="Margin" Value="0"/><Setter Property="Padding" Value="9,5"/><Setter Property="MinHeight" Value="30"/><Setter Property="CornerRadius" Value="5"/></Style>
+    <Style Selector="#EditorPanel TextBox"><Setter Property="Margin" Value="0"/><Setter Property="MinHeight" Value="30"/><Setter Property="CornerRadius" Value="5"/></Style>
+    <Style Selector="#EditorPanel ComboBox"><Setter Property="Margin" Value="0"/><Setter Property="MinHeight" Value="30"/></Style>
     <Style Selector="WrapPanel > TextBlock"><Setter Property="VerticalAlignment" Value="Center"/></Style>
     <Style Selector="WrapPanel > CheckBox"><Setter Property="VerticalAlignment" Value="Center"/></Style>
   </Window.Styles>
@@ -39,40 +43,40 @@
       </Border>
       </Grid></ScrollViewer>
       <TextBlock x:Name="InfoText" IsVisible="False" Text="Gathering video info..." HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
-      <Grid x:Name="EditorPanel" IsVisible="False" RowDefinitions="*" ColumnDefinitions="*,420" Margin="16" ColumnSpacing="16">
-        <Grid x:Name="PreviewPane" Grid.Column="0" RowDefinitions="*,Auto,Auto" RowSpacing="10">
-          <Border Grid.Row="0" Background="#0E1412" CornerRadius="12" ClipToBounds="True" MinHeight="220">
+      <Grid x:Name="EditorPanel" IsVisible="False" RowDefinitions="*" ColumnDefinitions="*,420" Margin="12" ColumnSpacing="12">
+        <Grid x:Name="PreviewPane" Grid.Column="0" RowDefinitions="*,Auto,Auto" RowSpacing="8">
+          <Border Grid.Row="0" Background="#101214" CornerRadius="6" ClipToBounds="True" MinHeight="220">
             <media:VideoStage x:Name="VideoStage">
               <media:MpvVideoControl x:Name="VideoSurface"/>
               <media:CropOverlayControl x:Name="CropOverlay" ToolTip.Tip="Drag to crop; drag selection to move or resize by any edge; right-click to clear"/>
             </media:VideoStage>
           </Border>
-          <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="10" Padding="10,8">
-            <StackPanel Spacing="4">
-              <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
+          <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="10,8">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="5">
                 <Button x:Name="PlayButton" Content="Play / Pause" Click="OnPlayPause"/>
-                <Button Grid.Column="1" Content="Frame -" Click="OnFrameBackStep"/>
-                <Button Grid.Column="2" Content="Frame +" Click="OnFrameStep"/>
-                <media:RangeTimeline x:Name="SeekSlider" Grid.Column="3" Maximum="100" Margin="8,0" VerticalAlignment="Center"
+                <Button Grid.Column="1" Content="- 1f" Click="OnFrameBackStep" ToolTip.Tip="Previous frame"/>
+                <Button Grid.Column="2" Content="+ 1f" Click="OnFrameStep" ToolTip.Tip="Next frame"/>
+                <media:RangeTimeline x:Name="SeekSlider" Grid.Column="3" Maximum="100" Margin="6,0" VerticalAlignment="Center"
                                      TrackBrush="{DynamicResource LineBrush}" HighlightBrush="{DynamicResource AccentBrush}"
                                      ThumbBrush="{DynamicResource SurfaceBrush}" PropertyChanged="OnSeekChanged"/>
-                <TextBlock x:Name="ClockText" Grid.Column="4" Text="00:00 / 00:00" VerticalAlignment="Center" Margin="8"/>
+                <TextBlock x:Name="ClockText" Grid.Column="4" Text="00:00 / 00:00" VerticalAlignment="Center" Margin="4,0,0,0" FontSize="12"/>
               </Grid>
-              <WrapPanel>
-                <Button Content="Mark start [" Click="OnMarkStart" ToolTip.Tip="Set fragment start ([)"/>
-                <TextBox x:Name="StartBox" Width="95" PlaceholderText="Start" ToolTip.Tip="Fragment start; edit or mark with ["/>
-                <Button Content="Mark end ]" Click="OnMarkEnd" ToolTip.Tip="Set fragment end (])"/>
-                <TextBox x:Name="EndBox" Width="95" PlaceholderText="End" ToolTip.Tip="Fragment end; edit or mark with ]"/>
-                <CheckBox x:Name="LoopBox" Content="Loop fragment" VerticalAlignment="Center" Margin="8,0"/>
-                <TextBox x:Name="TimeBox" Width="90" ToolTip.Tip="Enter a time and press Enter" KeyDown="OnTimeKeyDown"/>
-                <Button x:Name="MuteButton" Content="Mute" Click="OnMute"/>
-                <Slider x:Name="VolumeSlider" Width="95" Minimum="0" Maximum="100" Value="100" VerticalAlignment="Center" PropertyChanged="OnVolumeChanged"/>
-              </WrapPanel>
+              <Grid ColumnDefinitions="Auto,92,Auto,92,Auto,96,Auto,*" ColumnSpacing="5">
+                <Button Content="In [" Click="OnMarkStart" ToolTip.Tip="Set fragment start ([)"/>
+                <TextBox x:Name="StartBox" Grid.Column="1" Height="30" VerticalAlignment="Center" PlaceholderText="Start" ToolTip.Tip="Fragment start; edit or mark with ["/>
+                <Button Grid.Column="2" Content="Out ]" Click="OnMarkEnd" ToolTip.Tip="Set fragment end (])"/>
+                <TextBox x:Name="EndBox" Grid.Column="3" Height="30" VerticalAlignment="Center" PlaceholderText="End" ToolTip.Tip="Fragment end; edit or mark with ]"/>
+                <CheckBox x:Name="LoopBox" Grid.Column="4" Content="Loop" VerticalAlignment="Center" Margin="2,0" ToolTip.Tip="Loop fragment"/>
+                <TextBox x:Name="TimeBox" Grid.Column="5" Height="30" VerticalAlignment="Center" ToolTip.Tip="Enter a time and press Enter" KeyDown="OnTimeKeyDown"/>
+                <Button x:Name="MuteButton" Grid.Column="6" Content="Mute" Click="OnMute"/>
+                <Slider x:Name="VolumeSlider" Grid.Column="7" Width="110" Minimum="0" Maximum="100" Value="100" Margin="4,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" PropertyChanged="OnVolumeChanged"/>
+              </Grid>
             </StackPanel>
           </Border>
           <TextBlock x:Name="ValidationText" Grid.Row="2" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap"/>
         </Grid>
-        <Border x:Name="InspectorPane" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="12" ClipToBounds="True">
+        <Border x:Name="InspectorPane" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
           <Grid>
         <TabControl x:Name="EditorTabs">
           <TabItem Header="Info"><ScrollViewer><StackPanel Margin="16" Spacing="14">

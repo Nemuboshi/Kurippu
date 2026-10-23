@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Headless.XUnit;
+using Kurippu.Desktop.Services;
 using Kurippu.Core;
 using Kurippu.Desktop.Media;
 using Kurippu.Desktop.Theming;
@@ -10,6 +12,25 @@ namespace Kurippu.Desktop.Tests;
 
 public class WorkbenchTests
 {
+    [AvaloniaFact]
+    public void PlaybackControlsStayOnTwoRowsAtMinimumWindowWidth()
+    {
+        using var window = new MainWindow(new ProcessRunner(), "ffmpeg", () => null);
+        window.Width = window.MinWidth;
+        window.Height = window.MinHeight;
+        window.FindControl<Grid>("EditorPanel")!.IsVisible = true;
+        window.FindControl<ScrollViewer>("SourceScroll")!.IsVisible = false;
+        window.Show();
+        try
+        {
+            var mute = window.FindControl<Button>("MuteButton")!;
+            var volume = window.FindControl<Slider>("VolumeSlider")!;
+            Assert.IsType<Grid>(volume.Parent);
+            Assert.InRange(Math.Abs(mute.Bounds.Center.Y - volume.Bounds.Center.Y), 0, 2);
+        }
+        finally { window.Close(); }
+    }
+
     [Theory]
     [InlineData("System", null)]
     [InlineData("Light", "Light")]

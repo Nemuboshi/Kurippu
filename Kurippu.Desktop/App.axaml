@@ -7,24 +7,24 @@
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="CanvasBrush" Color="#F3F1E9"/>
-                    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFEF9"/>
-                    <SolidColorBrush x:Key="RaisedBrush" Color="#EAEDE5"/>
-                    <SolidColorBrush x:Key="InkBrush" Color="#22332E"/>
-                    <SolidColorBrush x:Key="MutedBrush" Color="#64736B"/>
-                    <SolidColorBrush x:Key="LineBrush" Color="#D8DFD6"/>
+                    <SolidColorBrush x:Key="CanvasBrush" Color="#F4F5F6"/>
+                    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF"/>
+                    <SolidColorBrush x:Key="RaisedBrush" Color="#F0F1F2"/>
+                    <SolidColorBrush x:Key="InkBrush" Color="#202327"/>
+                    <SolidColorBrush x:Key="MutedBrush" Color="#6C727A"/>
+                    <SolidColorBrush x:Key="LineBrush" Color="#E0E3E6"/>
                     <SolidColorBrush x:Key="AccentBrush" Color="#087F70"/>
                     <Color x:Key="SystemAccentColor">#087F70</Color>
                     <SolidColorBrush x:Key="AccentInkBrush" Color="#FFFFFF"/>
                     <SolidColorBrush x:Key="ErrorBrush" Color="#AA4537"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="CanvasBrush" Color="#181F1D"/>
-                    <SolidColorBrush x:Key="SurfaceBrush" Color="#242E2B"/>
-                    <SolidColorBrush x:Key="RaisedBrush" Color="#34413C"/>
-                    <SolidColorBrush x:Key="InkBrush" Color="#F0F2E9"/>
-                    <SolidColorBrush x:Key="MutedBrush" Color="#A7B9AE"/>
-                    <SolidColorBrush x:Key="LineBrush" Color="#46554E"/>
+                    <SolidColorBrush x:Key="CanvasBrush" Color="#1E2023"/>
+                    <SolidColorBrush x:Key="SurfaceBrush" Color="#292C30"/>
+                    <SolidColorBrush x:Key="RaisedBrush" Color="#35393E"/>
+                    <SolidColorBrush x:Key="InkBrush" Color="#F2F3F4"/>
+                    <SolidColorBrush x:Key="MutedBrush" Color="#AFB5BC"/>
+                    <SolidColorBrush x:Key="LineBrush" Color="#444A50"/>
                     <SolidColorBrush x:Key="AccentBrush" Color="#62C7AE"/>
                     <Color x:Key="SystemAccentColor">#62C7AE</Color>
                     <SolidColorBrush x:Key="AccentInkBrush" Color="#102720"/>
