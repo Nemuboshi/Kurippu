@@ -15,14 +15,15 @@ public sealed partial class LinuxNativeDependencyInspector(IProcessRunner proces
             throw new PackagingException($"Missing dependency for {file}:{Environment.NewLine}" +
                 result.StandardOutput);
 
-        return result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        return result.StandardOutput.Split(["\r\n", "\n"],
+                StringSplitOptions.RemoveEmptyEntries)
             .Select(line => DependencyRegex().Match(line))
             .Where(match => match.Success)
             .Select(match => match.Groups[2].Value)
             .ToArray();
     }
 
-    [GeneratedRegex(@"^\s+(\S+\.so(?:\.\d+)*)\s+=>\s+(.+?)(?:\s+\(0x[0-9a-fA-F]+\))?$",
+    [GeneratedRegex(@"^\s+(\S+\.so(?:\.\d+)*)\s+=>\s+(.+?)(?:\s+\(0x[0-9a-fA-F]+\))?\s*$",
         RegexOptions.CultureInvariant)]
     private static partial Regex DependencyRegex();
 }
