@@ -27,6 +27,30 @@ public sealed class NativeDependencyStagerTests
     }
 
     [Fact]
+    public async Task MacReplacesReadOnlyExistingDependencyFiles()
+    {
+        using var fixture = new NativeFixture();
+        var existing = Path.Combine(fixture.Output, "libavcodec.dylib");
+        await File.WriteAllTextAsync(existing, "stale");
+        MakeReadOnly(existing);
+        var runner = fixture.CreateMacRunner();
+        var stager = new NativeDependencyStager(runner);
+
+        try
+        {
+            await stager.StageMacOSAsync(fixture.Output, CancellationToken.None);
+
+            Assert.Equal("codec", await File.ReadAllTextAsync(existing));
+            if (!OperatingSystem.IsWindows())
+                Assert.True(File.GetUnixFileMode(existing).HasFlag(UnixFileMode.UserWrite));
+        }
+        finally
+        {
+            MakeWritable(existing);
+        }
+    }
+
+    [Fact]
     public async Task LinuxStagesRecursiveClosureAndIgnoresSystemRuntimeLibraries()
     {
         using var fixture = new NativeFixture();
@@ -163,5 +187,28 @@ public sealed class NativeDependencyStagerTests
         {
             if (Directory.Exists(Root)) Directory.Delete(Root, recursive: true);
         }
+    }
+
+    private static void MakeReadOnly(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
+            return;
+        }
+
+        File.SetUnixFileMode(path, UnixFileMode.UserRead);
+    }
+
+    private static void MakeWritable(string path)
+    {
+        if (!File.Exists(path)) return;
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+            return;
+        }
+
+        File.SetUnixFileMode(path, File.GetUnixFileMode(path) | UnixFileMode.UserWrite);
     }
 }

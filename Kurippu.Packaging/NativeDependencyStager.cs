@@ -46,7 +46,7 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
                 string.Equals(real, Path.GetFullPath(source), StringComparison.Ordinal)
                     ? "libmpv.dylib"
                     : Path.GetFileName(real));
-            File.Copy(real, target, overwrite: true);
+            CopyReplacingReadOnly(real, target);
             staged[real] = target;
 
             foreach (var reference in await inspector.GetDependenciesAsync(real, cancellationToken).ConfigureAwait(false))
@@ -105,7 +105,7 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
         {
             var target = Path.Combine(output, name);
             if (!staged.Add(target)) return;
-            File.Copy(file, target, overwrite: true);
+            CopyReplacingReadOnly(file, target);
 
             foreach (var dependency in await inspector.GetDependenciesAsync(file,
                          cancellationToken).ConfigureAwait(false))
@@ -131,6 +131,20 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
             candidates.AddRange(Directory.EnumerateDirectories(optRoot)
                 .Select(directory => Path.Combine(directory, "lib", name)));
         return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static void CopyReplacingReadOnly(string source, string target)
+    {
+        if (File.Exists(target))
+        {
+            if (OperatingSystem.IsWindows())
+                File.SetAttributes(target, File.GetAttributes(target) & ~FileAttributes.ReadOnly);
+            File.Delete(target);
+        }
+
+        File.Copy(source, target);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(target, File.GetUnixFileMode(target) | UnixFileMode.UserWrite);
     }
 
     private async Task<string> RunRequired(string fileName,
