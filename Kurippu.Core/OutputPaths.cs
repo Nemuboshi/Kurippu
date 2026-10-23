@@ -4,6 +4,12 @@ namespace Kurippu.Core;
 
 public static class OutputPaths
 {
+    public static string? ExistingDirectory(string? outputPath, Func<string, bool> exists)
+    {
+        var directory = Path.GetDirectoryName(outputPath);
+        return directory is not null && exists(directory) ? directory : null;
+    }
+
     public static string NextAvailable(string directory, string sourceName, string container, Func<string, bool> exists)
     {
         var name = Path.GetFileNameWithoutExtension(sourceName);

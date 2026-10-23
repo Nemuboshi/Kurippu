@@ -16,14 +16,19 @@ namespace Kurippu.Desktop;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel model = new();
-    private readonly IProcessRunner process = new ProcessRunner();
-    private MpvPlayer? player;
+    private readonly IProcessRunner process;
+    private readonly string ffmpeg;
+    private readonly Func<string?> defaultOutputDirectory;
+    private readonly Func<Task<IMediaPlayer>> openPlayer;
+    private readonly Action<string> openPath;
+    private readonly Func<Action<EncodeUpdate>, IProgress<EncodeUpdate>> createEncodeProgress;
+    private IMediaPlayer? player;
     private SourceService? sourceService;
     private SourceChoices? sourceChoices;
     private CancellationTokenSource? downloadCancellation;
     private string? downloadedSource;
     private int sourceGeneration;
-    private CancellationTokenSource? encodeCancellation;
+    private EncodeProgressSession? encodeProgress;
     private readonly DetectionSession detection = new();
     private readonly ActivityLog activityLog = new();
     private LogWindow? logWindow;
@@ -40,8 +45,36 @@ public partial class MainWindow : Window
     private bool muted;
     private string? lastOutput;
 
-    public MainWindow()
+    public MainWindow() : this(new ProcessRunner(),
+        ToolLocator.Default.Ffmpeg() ?? throw new FileNotFoundException("Bundled FFmpeg not found"),
+        DefaultOutputDirectory, () => Task.FromResult<IMediaPlayer>(new MpvPlayer()),
+        OpenPath, callback => new Progress<EncodeUpdate>(callback))
     {
+    }
+
+    internal MainWindow(IProcessRunner process, string ffmpeg, Func<string?> defaultOutputDirectory)
+        : this(process, ffmpeg, defaultOutputDirectory, () => Task.FromResult<IMediaPlayer>(new MpvPlayer()),
+            OpenPath, callback => new Progress<EncodeUpdate>(callback))
+    {
+    }
+
+    internal MainWindow(IProcessRunner process, string ffmpeg, Func<string?> defaultOutputDirectory,
+        Func<Task<IMediaPlayer>> openPlayer)
+        : this(process, ffmpeg, defaultOutputDirectory, openPlayer,
+            OpenPath, callback => new Progress<EncodeUpdate>(callback))
+    {
+    }
+
+    internal MainWindow(IProcessRunner process, string ffmpeg, Func<string?> defaultOutputDirectory,
+        Func<Task<IMediaPlayer>> openPlayer, Action<string> openPath,
+        Func<Action<EncodeUpdate>, IProgress<EncodeUpdate>> createEncodeProgress)
+    {
+        this.process = process;
+        this.ffmpeg = ffmpeg;
+        this.defaultOutputDirectory = defaultOutputDirectory;
+        this.openPlayer = openPlayer;
+        this.openPath = openPath;
+        this.createEncodeProgress = createEncodeProgress;
         InitializeComponent();
         DataContext = model;
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -88,7 +121,7 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DropEvent, OnDrop);
         Closed += (_, _) => {
             sourceGeneration++;
-            downloadCancellation?.Cancel(); encodeCancellation?.Cancel(); detection.Dispose();
+            downloadCancellation?.Cancel(); encodeProgress?.Cancel(); detection.Dispose();
             logWindow?.Close();
             VideoSurface.Dispose(); player?.Dispose(); sourceService?.Dispose();
         };
@@ -170,7 +203,7 @@ public partial class MainWindow : Window
 
     private void OnCancelDownload(object? sender, RoutedEventArgs e) => downloadCancellation?.Cancel();
 
-    private async Task OpenSourceAsync(string path, bool preserveSourceMetadata = false)
+    internal async Task OpenSourceAsync(string path, bool preserveSourceMetadata = false)
     {
         var generation = ++sourceGeneration;
         detection.CancelForEdit();
@@ -189,7 +222,7 @@ public partial class MainWindow : Window
                 sourceService?.Release(previous);
                 downloadedSource = null;
             }
-            player = new MpvPlayer();
+            player = await openPlayer();
             var media = await player.OpenAsync(path);
             if (generation != sourceGeneration) return;
             initializingEditor = true;
@@ -357,17 +390,17 @@ public partial class MainWindow : Window
             if (player?.Property("pause") != "yes")
                 throw new InvalidOperationException("Playback cannot pause during encoding");
             SetEncodingControls(true);
-            using (var cancellation = new CancellationTokenSource())
+            using (var progress = new EncodeProgressSession())
             {
-                encodeCancellation = cancellation;
+                encodeProgress = progress;
                 EncodeProgress.Value = 43;
                 OnCancelEncode(null, null!);
-                if (!cancellation.IsCancellationRequested || EncodeProgress.Value != 0)
+                if (!progress.Token.IsCancellationRequested || EncodeProgress.Value != 0)
                     throw new InvalidOperationException($"Cancel did not reset encoding progress: {EncodeProgress.Value}");
-                ApplyEncodeUpdate(new EncodeUpdate("late progress", 70), cancellation.Token);
+                ApplyEncodeUpdate(new EncodeUpdate("late progress", 70), progress.Token);
                 if (EncodeProgress.Value != 0)
                     throw new InvalidOperationException("Queued progress reappeared after cancel");
-                encodeCancellation = null;
+                encodeProgress = null;
             }
             if (this.FindControl<Button>("TestEncodeButton") is not null)
                 throw new InvalidOperationException("Test encode is still exposed in the workbench");
@@ -635,20 +668,21 @@ public partial class MainWindow : Window
         if (button is not null) button.IsEnabled = false;
         try
         {
-            var ffmpeg = ToolLocator.Default.Ffmpeg() ?? throw new FileNotFoundException("Bundled FFmpeg not found");
             var detector = new DetectionService(process, ffmpeg);
             var start = editor.Plan.Options?.Start ?? 0;
             var track = editor.Options.VideoTrack;
             if (interlace)
             {
                 var detected = await detector.DetectInterlaceAsync(editor.Media.Path, start, track, token);
-                if (!token.IsCancellationRequested && generation == sourceGeneration && detected)
+                if (!token.IsCancellationRequested && generation == sourceGeneration &&
+                    detection.Token == token && detected)
                 { DeinterlaceBox.IsChecked = true; UpdateOptions(); }
             }
             else
             {
                 var crop = await detector.DetectCropAsync(editor.Media.Path, start, track, token);
-                if (token.IsCancellationRequested || generation != sourceGeneration || crop is null) return;
+                if (token.IsCancellationRequested || generation != sourceGeneration || crop is null ||
+                    detection.Token != token) return;
                 if (FfmpegDetection.IsFullFrame(crop, editor.Media, track)) ClearCrop();
                 else CropOverlay.ApplyDetectedCrop(crop);
             }
@@ -720,9 +754,7 @@ public partial class MainWindow : Window
     private void RefreshOutputPath()
     {
         if (!autoOutputPath || model.Editor is not { } editor) return;
-        var directory = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
-            directory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var directory = defaultOutputDirectory();
         if (string.IsNullOrWhiteSpace(directory)) return;
         var next = OutputPaths.NextAvailable(directory, sourceSaveAs ?? editor.Media.Path,
             editor.Container, File.Exists);
@@ -783,9 +815,10 @@ public partial class MainWindow : Window
 
     private async void OnEncode(object? sender, RoutedEventArgs e) => await StartEncodeAsync();
 
-    private async Task StartEncodeAsync()
+    internal async Task StartEncodeAsync()
     {
         if (encoding || model.Editor is not { } editor) return;
+        EncodeProgressSession? progressSession = null;
         try
         {
             if (BurnSubsBox.IsChecked == true &&
@@ -798,17 +831,17 @@ public partial class MainWindow : Window
             if (!editor.CanEncode) return;
             if (string.IsNullOrWhiteSpace(editor.RawArguments)) throw new FormatException("FFmpeg arguments are empty");
             var rawArguments = FfmpegArguments.ParseRaw(editor.RawArguments);
-            var ffmpeg = ToolLocator.Default.Ffmpeg() ?? throw new FileNotFoundException("Bundled FFmpeg not found");
             var output = OutputBox.Text ?? "";
             if (string.IsNullOrWhiteSpace(output) || !Directory.Exists(Path.GetDirectoryName(output)))
                 throw new InvalidOperationException("Choose a writable output folder");
             encoding = true;
             lastOutput = null;
             SetEncodingControls(false);
-            encodeCancellation = new CancellationTokenSource();
-            var cancellation = encodeCancellation;
+            progressSession = new EncodeProgressSession();
+            encodeProgress = progressSession;
             EncodeProgress.Value = 0;
-            var progress = new Progress<EncodeUpdate>(update => ApplyEncodeUpdate(update, cancellation.Token));
+            var token = progressSession.Token;
+            var progress = createEncodeProgress(update => ApplyEncodeUpdate(update, token));
             var service = new EncodeService(process, ffmpeg);
             PreviewSource? preview = null;
             if (!string.IsNullOrWhiteSpace(PreviewPathBox.Text))
@@ -822,8 +855,8 @@ public partial class MainWindow : Window
                         editor.Media.VideoTracks[editor.Options.VideoTrack].Fps : 25);
             }
             await service.EncodeAsync(editor.Plan.Options!, output,
-                TitleBox.Text ?? "", editor.Options.TwoPass, false, progress, encodeCancellation.Token, preview, rawArguments);
-            encodeCancellation.Token.ThrowIfCancellationRequested();
+                TitleBox.Text ?? "", editor.Options.TwoPass, false, progress, token, preview, rawArguments);
+            token.ThrowIfCancellationRequested();
             EncodeProgress.Value = 100;
             lastOutput = output;
             RefreshOutputPath();
@@ -832,16 +865,17 @@ public partial class MainWindow : Window
         catch (Exception ex) { ShowError(ex.Message); }
         finally
         {
-            if (encodeCancellation?.IsCancellationRequested == true) EncodeProgress.Value = 0;
+            if (progressSession?.Token.IsCancellationRequested == true) EncodeProgress.Value = 0;
             encoding = false;
             SetEncodingControls(true);
-            encodeCancellation?.Dispose(); encodeCancellation = null;
+            progressSession?.Dispose();
+            if (encodeProgress == progressSession) encodeProgress = null;
         }
     }
 
     private void ApplyEncodeUpdate(EncodeUpdate update, CancellationToken token)
     {
-        if (token.IsCancellationRequested || encodeCancellation is null || encodeCancellation.Token != token) return;
+        if (token.IsCancellationRequested || encodeProgress?.Token != token) return;
         activityLog.AppendLine(update.Line);
         EncodeProgress.Value = update.Percent;
     }
@@ -853,23 +887,29 @@ public partial class MainWindow : Window
         ChangeSourceButton.IsEnabled = enabled;
     }
 
+    internal void CancelEncode()
+    {
+        if (encodeProgress is null) return;
+        encodeProgress.Cancel();
+        EncodeProgress.Value = 0;
+    }
+
     private void OnCancelEncode(object? sender, RoutedEventArgs e)
     {
-        if (encodeCancellation is null) return;
-        encodeCancellation.Cancel();
-        EncodeProgress.Value = 0;
+        CancelEncode();
     }
     private void OnOpenOutput(object? sender, RoutedEventArgs e)
     {
         var output = lastOutput;
         if (output is null || !File.Exists(output)) return;
-        Process.Start(new ProcessStartInfo(output) { UseShellExecute = true });
+        openPath(output);
     }
     private void OnShowOutputFolder(object? sender, RoutedEventArgs e)
     {
-        var directory = Path.GetDirectoryName(lastOutput);
-        if (directory is not null && Directory.Exists(directory))
-            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+        var directory = OutputPaths.ExistingDirectory(lastOutput ?? OutputBox.Text, Directory.Exists);
+        if (directory is not null)
+            openPath(directory);
+        else ShowError("Choose an output folder first");
     }
 
     private void ShowError(string message)
@@ -879,6 +919,17 @@ public partial class MainWindow : Window
         ValidationText.Text = message;
         activityLog.AppendLine(message);
     }
+
+    private static string? DefaultOutputDirectory()
+    {
+        var directory = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory)) return directory;
+        directory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return !string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory) ? directory : null;
+    }
+
+    private static void OpenPath(string path) =>
+        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
 
     private void OnThemeChanged(object? sender, SelectionChangedEventArgs e)
     {

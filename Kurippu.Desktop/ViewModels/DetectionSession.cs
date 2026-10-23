@@ -4,6 +4,7 @@ public sealed class DetectionSession : IDisposable
 {
     private CancellationTokenSource? current;
     public bool Active => current is not null;
+    public CancellationToken? Token => current?.Token;
 
     public CancellationToken Begin(Action synchronize)
     {

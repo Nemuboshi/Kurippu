@@ -16,7 +16,7 @@ public sealed class MpvVideoControl : Control, IDisposable
     private bool hasFrame;
     private bool oversized;
     private bool disposed;
-    public MpvPlayer? Player { get; set; }
+    public IMediaPlayer? Player { get; set; }
     public bool HasFrame => hasFrame;
     public event Action<double>? TimeChanged;
 

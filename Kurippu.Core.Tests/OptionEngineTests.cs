@@ -154,6 +154,22 @@ public class OptionEngineTests
     }
 
     [Fact]
+    public void OutputFolderCanBeResolvedBeforeTheOutputFileExists()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "kurippu-output-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var output = Path.Combine(directory, "clip.mp4");
+            Assert.Equal(directory, OutputPaths.ExistingDirectory(output, Directory.Exists));
+        }
+        finally
+        {
+            Directory.Delete(directory);
+        }
+    }
+
+    [Fact]
     public void InvalidFragmentCannotProduceEncodeArguments()
     {
         var result = OptionEngine.Derive(new OptionInputs { Start = "90", End = "40" }, Media);

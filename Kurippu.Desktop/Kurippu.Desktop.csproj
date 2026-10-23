@@ -25,6 +25,10 @@
     <ProjectReference Include="..\Kurippu.Core\Kurippu.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kurippu.Desktop.Tests" />
+  </ItemGroup>
+
   <Target Name="ValidatePackageRuntimeIdentifier">
     <Error Condition="'$(RuntimeIdentifier)' == ''"
            Text="Package requires -r/--runtime. Supported RIDs: win-x64;osx-x64;osx-arm64;linux-x64." />

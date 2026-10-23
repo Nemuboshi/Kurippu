@@ -4,7 +4,7 @@ using Kurippu.Core;
 
 namespace Kurippu.Desktop.Media;
 
-public sealed class MpvPlayer : IDisposable
+public sealed class MpvPlayer : IMediaPlayer
 {
     private readonly object gate = new();
     private IntPtr handle;

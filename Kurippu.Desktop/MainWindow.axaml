@@ -89,7 +89,7 @@
                 <StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="X" Classes="section"/><TextBox x:Name="CropXBox" PlaceholderText="0"/></StackPanel>
                 <StackPanel Grid.Column="3" Spacing="4"><TextBlock Text="Y" Classes="section"/><TextBox x:Name="CropYBox" PlaceholderText="0"/></StackPanel>
               </Grid>
-              <WrapPanel><Button Content="Detect bars" Click="OnDetectCrop"/><Button Content="Clear crop" Click="OnClearCrop"/></WrapPanel>
+              <WrapPanel><Button x:Name="DetectCropButton" Content="Detect bars" Click="OnDetectCrop"/><Button Content="Clear crop" Click="OnClearCrop"/></WrapPanel>
             </StackPanel>
             <StackPanel Spacing="8">
               <TextBlock Text="Scale and display" FontWeight="SemiBold"/>
@@ -99,7 +99,7 @@
               </Grid>
               <CheckBox x:Name="FixSarBox" Content="Fix sample aspect ratio"/>
               <CheckBox x:Name="DeinterlaceBox" Content="Deinterlace" Click="OnEditorOptionChanged"/>
-              <Button Content="Detect interlace" Click="OnDetectInterlace" HorizontalAlignment="Left"/>
+              <Button x:Name="DetectInterlaceButton" Content="Detect interlace" Click="OnDetectInterlace" HorizontalAlignment="Left"/>
             </StackPanel>
             <StackPanel Spacing="8">
               <TextBlock Text="Tracks and subtitles" FontWeight="SemiBold"/>
@@ -143,9 +143,9 @@
             </StackPanel>
             <StackPanel Spacing="8">
               <TextBlock Text="Encode" FontWeight="SemiBold"/>
-              <WrapPanel><Button x:Name="EncodeButton" Classes="primary" Content="Encode" Click="OnEncode"/><Button Content="Cancel" Click="OnCancelEncode"/></WrapPanel>
+              <WrapPanel><Button x:Name="EncodeButton" Classes="primary" Content="Encode" Click="OnEncode"/><Button x:Name="CancelEncodeButton" Content="Cancel" Click="OnCancelEncode"/></WrapPanel>
               <ProgressBar x:Name="EncodeProgress" Height="16" Maximum="100" Margin="3,0"/>
-              <WrapPanel><Button Content="Open output" Click="OnOpenOutput"/><Button Content="Show folder" Click="OnShowOutputFolder"/></WrapPanel>
+              <WrapPanel><Button x:Name="OpenOutputButton" Content="Open output" Click="OnOpenOutput"/><Button x:Name="ShowOutputFolderButton" Content="Show folder" Click="OnShowOutputFolder"/></WrapPanel>
             </StackPanel>
             <StackPanel Spacing="8">
               <TextBlock Text="Preview source" FontWeight="SemiBold"/>
