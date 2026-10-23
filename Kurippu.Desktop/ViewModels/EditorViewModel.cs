@@ -31,7 +31,11 @@ public sealed class EditorViewModel : INotifyPropertyChanged
     public void SetCrfMode(bool enabled)
     {
         Options.CrfMode = enabled;
-        if (enabled) Options.LimitMode = false;
+        if (enabled)
+        {
+            Options.LimitMode = false;
+            Options.TwoPass = false;
+        }
         Options.Limit = enabled ? "0" : "";
         Refresh();
     }
@@ -48,7 +52,12 @@ public sealed class EditorViewModel : INotifyPropertyChanged
     public void SetTwoPass(bool enabled)
     {
         Options.TwoPass = enabled;
-        if (enabled && !Options.CrfMode) Options.LimitMode = true;
+        if (enabled)
+        {
+            Options.CrfMode = false;
+            Options.LimitMode = true;
+            Options.Limit = "";
+        }
         Refresh();
     }
 
