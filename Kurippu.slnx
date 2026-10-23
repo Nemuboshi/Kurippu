@@ -3,4 +3,6 @@
   <Project Path="Kurippu.Core/Kurippu.Core.csproj" />
   <Project Path="Kurippu.Desktop.Tests/Kurippu.Desktop.Tests.csproj" />
   <Project Path="Kurippu.Desktop/Kurippu.Desktop.csproj" />
+  <Project Path="Kurippu.Packaging.Tests/Kurippu.Packaging.Tests.csproj" />
+  <Project Path="Kurippu.Packaging/Kurippu.Packaging.csproj" />
 </Solution>
