@@ -19,13 +19,13 @@ public static class MpvNative
 
     private static IntPtr Resolve(string name, Assembly assembly, DllImportSearchPath? path)
     {
-        if (name != Library) return IntPtr.Zero;
+        if (!string.Equals(name, Library, StringComparison.Ordinal)) return IntPtr.Zero;
         var platform = OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux";
         var filename = LibraryFileName(platform);
         var local = Path.Combine(AppContext.BaseDirectory, filename);
         if (NativeLibrary.TryLoad(local, out var loaded)) return loaded;
         if (NativeLibrary.TryLoad(filename, assembly, path, out loaded)) return loaded;
-        if (platform == "win" && NativeLibrary.TryLoad("mpv-2.dll", assembly, path, out loaded)) return loaded;
+        if (string.Equals(platform, "win", StringComparison.Ordinal) && NativeLibrary.TryLoad("mpv-2.dll", assembly, path, out loaded)) return loaded;
         throw new DllNotFoundException($"libmpv not found: {local}");
     }
 

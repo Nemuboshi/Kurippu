@@ -57,7 +57,7 @@ public sealed class CropOverlayControl : Control
         var dx = point.X - origin.X;
         var dy = point.Y - origin.Y;
         var r = (Math.Min(origin.X, point.X), Math.Min(origin.Y, point.Y), Math.Abs(dx), Math.Abs(dy));
-        if (dragMode != "draw") r = VideoGeometry.DragViewport(initial, dragMode, dx, dy);
+        if (!string.Equals(dragMode, "draw", StringComparison.Ordinal)) r = VideoGeometry.DragViewport(initial, dragMode, dx, dy);
         if (r.Item3 >= 8 && r.Item4 >= 8)
             Commit(VideoGeometry.FromViewport(Bounds.Width, Bounds.Height, SourceWidth, SourceHeight,
                 Sar, r.Item1, r.Item2, r.Item3, r.Item4));
@@ -69,7 +69,7 @@ public sealed class CropOverlayControl : Control
         base.OnPointerReleased(e);
         if (dragMode is null) return;
         var point = e.GetPosition(this);
-        if (dragMode == "draw" && Math.Abs(point.X - origin.X) < 8 && Math.Abs(point.Y - origin.Y) < 8)
+        if (string.Equals(dragMode, "draw", StringComparison.Ordinal) && Math.Abs(point.X - origin.X) < 8 && Math.Abs(point.Y - origin.Y) < 8)
             Clicked?.Invoke();
         dragMode = null;
         e.Pointer.Capture(null);

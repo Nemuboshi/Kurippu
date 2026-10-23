@@ -104,7 +104,7 @@ public class FfmpegArgumentsTests
     {
         var args = FfmpegArguments.BuildTest(["-filter_complex", "[0:v:0][0:s:0]overlay[v]",
             "-map", "[v]", "-c:v", "libx264", "-f", "mp4"], "/tmp/test.mkv");
-        Assert.DoesNotContain("-vf", args);
+        Assert.DoesNotContain("-vf", args, StringComparer.Ordinal);
         Assert.Equal("[0:v:0][0:s:0]overlay,scale=floor((iw+1)/2)*2:-2[v]",
             args[Array.IndexOf(args, "-filter_complex") + 1]);
     }
@@ -126,7 +126,7 @@ public class FfmpegArgumentsTests
             1, "title", "/tmp/out.webm", "/tmp/pass-0.log");
 
         Assert.Equal(["-f", "null", "-"], args[^3..]);
-        Assert.Contains("-an", args);
+        Assert.Contains("-an", args, StringComparer.Ordinal);
         Assert.Equal("/tmp/pass", args[Array.IndexOf(args, "-passlogfile") + 1]);
         Assert.Equal("4", args[Array.IndexOf(args, "-speed") + 1]);
     }
@@ -149,7 +149,7 @@ public class FfmpegArgumentsTests
         Assert.Equal("18", args[Array.IndexOf(args, "-crf") + 1]);
         Assert.Equal("matroska", args[Array.LastIndexOf(args, "-f") + 1]);
         Assert.Equal("file:/tmp/test.mkv", args[^1]);
-        Assert.Contains("file:/tmp/a b.mkv", args);
+        Assert.Contains("file:/tmp/a b.mkv", args, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -170,8 +170,8 @@ public class FfmpegArgumentsTests
     {
         var args = FfmpegArguments.BuildTest(["-c:v", "libaom-av1", "-tile-columns", "2",
             "-tile-rows", "1", "-lossless", "1", "-qmin", "0", "-f", "webm"], "/tmp/test.mkv");
-        Assert.DoesNotContain("-tile-rows", args);
-        Assert.DoesNotContain("-lossless", args);
-        Assert.DoesNotContain("-qmin", args);
+        Assert.DoesNotContain("-tile-rows", args, StringComparer.Ordinal);
+        Assert.DoesNotContain("-lossless", args, StringComparer.Ordinal);
+        Assert.DoesNotContain("-qmin", args, StringComparer.Ordinal);
     }
 }

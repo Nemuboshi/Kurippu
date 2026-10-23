@@ -30,7 +30,7 @@ public class SourceServiceTests
         Assert.Equal("v1", source.Videos.Single().Id);
         Assert.Equal("a1", source.Audios.First().Id);
         Assert.Equal("none", source.Audios.Last().Id);
-        Assert.Contains("--dump-json", runner.Calls[0]);
+        Assert.Contains("--dump-json", runner.Calls[0], StringComparer.Ordinal);
     }
 
     [Fact]
@@ -60,8 +60,8 @@ public class SourceServiceTests
             CancellationToken.None);
         try
         {
-            Assert.Contains("v1+a1", runner.Calls[1]);
-            Assert.Contains("/tools/ffmpeg", runner.Calls[1]);
+            Assert.Contains("v1+a1", runner.Calls[1], StringComparer.Ordinal);
+            Assert.Contains("/tools/ffmpeg", runner.Calls[1], StringComparer.Ordinal);
             Assert.Equal("https://example.org/video", runner.Calls[1][^1]);
             Assert.EndsWith(".mkv", path);
         }

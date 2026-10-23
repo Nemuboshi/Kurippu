@@ -18,7 +18,7 @@ public static class ArchiveExtractor
             ? ".tar.xz"
             : Path.GetExtension(archivePath).ToLowerInvariant();
 
-        if (extension == ".tar.xz")
+        if (string.Equals(extension, ".tar.xz", StringComparison.Ordinal))
         {
             ExtractTarXz(archivePath, root, names);
             return;

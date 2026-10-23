@@ -24,7 +24,7 @@ public sealed class EncodeService(IProcessRunner runner, string ffmpeg)
         var log = new Progress<string>(line =>
         {
             var match = Regex.Match(line, @"^frame=\s*(\d+)");
-            if (match.Success && int.TryParse(match.Groups[1].Value, out var frame))
+            if (match.Success && int.TryParse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var frame))
             {
                 current = Math.Min(99, current + (frame - lastFrame) / totalFrames *
                     (pass == 1 ? 30 : pass == 2 ? 70 : 100));
@@ -42,7 +42,7 @@ public sealed class EncodeService(IProcessRunner runner, string ffmpeg)
                 progress?.Report(new($"Test encode done: {output}", 100));
                 return;
             }
-            var container = options.VideoCodec == "x264" ? "mp4" : "webm";
+            var container = string.Equals(options.VideoCodec, "x264", StringComparison.Ordinal) ? "mp4" : "webm";
             var main = preview is null ? output : Path.Combine(directory, "main." + container);
             var count = twoPass ? 2 : 1;
             for (var index = 1; index <= count; index++)

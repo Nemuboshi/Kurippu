@@ -13,11 +13,11 @@ public class EncodeServiceTests
         var options = new EncodeOptions { InputPath = "/tmp/in.mkv", Duration = 10 };
         await service.EncodeAsync(options, "/tmp/out.mp4", "test", false, false, null, CancellationToken.None,
             rawArguments: ["-i", "file:/tmp/other path.mkv", "-c:v", "libx264", "-crf", "15", "-f", "mp4"]);
-        Assert.Contains("file:/tmp/other path.mkv", runner.Calls[0]);
-        Assert.DoesNotContain("file:/tmp/in.mkv", runner.Calls[0]);
+        Assert.Contains("file:/tmp/other path.mkv", runner.Calls[0], StringComparer.Ordinal);
+        Assert.DoesNotContain("file:/tmp/in.mkv", runner.Calls[0], StringComparer.Ordinal);
         await service.EncodeAsync(options, "/tmp/test.mkv", "test", false, true, null, CancellationToken.None,
             rawArguments: ["-i", "file:/tmp/other path.mkv", "-c:v", "libx264", "-f", "mp4"]);
-        Assert.Contains("file:/tmp/other path.mkv", runner.Calls[1]);
+        Assert.Contains("file:/tmp/other path.mkv", runner.Calls[1], StringComparer.Ordinal);
     }
     private sealed class Runner : IProcessRunner
     {
@@ -86,8 +86,8 @@ public class EncodeServiceTests
             new EncodeOptions { InputPath = "/tmp/input.mkv", Duration = 10 },
             "/tmp/final.mp4", "test", false, false, null, CancellationToken.None, preview);
         Assert.Equal(3, runner.Calls.Count);
-        Assert.Contains("-frames:v", runner.Calls[1]);
-        Assert.Contains("concat", runner.Calls[2]);
+        Assert.Contains("-frames:v", runner.Calls[1], StringComparer.Ordinal);
+        Assert.Contains("concat", runner.Calls[2], StringComparer.Ordinal);
         Assert.Equal("file:/tmp/final.mp4", runner.Calls[2][^1]);
     }
 }

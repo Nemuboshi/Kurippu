@@ -6,7 +6,7 @@ namespace Kurippu.Desktop.Media;
 
 public sealed class MpvPlayer : IMediaPlayer
 {
-    private readonly object gate = new();
+    private readonly Lock gate = new();
     private IntPtr handle;
     private IntPtr renderer;
     private bool disposed;
@@ -48,10 +48,10 @@ public sealed class MpvPlayer : IMediaPlayer
                 if (eventId == 8)
                 {
                     var count = Integer("track-list/count");
-                    var values = new Dictionary<string, string>
+                    var values = new Dictionary<string, string>(StringComparer.Ordinal)
                     {
                         ["duration"] = Property("duration"),
-                        ["track-list/count"] = count.ToString(),
+                        ["track-list/count"] = count.ToString(System.Globalization.CultureInfo.InvariantCulture),
                         ["media-title"] = Property("media-title"),
                         ["file-format"] = Property("file-format"),
                         ["file-size"] = Property("file-size"),
@@ -93,7 +93,7 @@ public sealed class MpvPlayer : IMediaPlayer
 
     public double Numeric(string name) => double.TryParse(Property(name), NumberStyles.Float,
         CultureInfo.InvariantCulture, out var value) ? value : 0;
-    public int Integer(string name) => int.TryParse(Property(name), out var value) ? value : 0;
+    public int Integer(string name) => int.TryParse(Property(name), System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : 0;
     public void Play() => Set("pause", "no");
     public void Pause() => Set("pause", "yes");
     public void Seek(double seconds) => Command("seek", seconds.ToString("0.###", CultureInfo.InvariantCulture), "absolute");
@@ -101,7 +101,7 @@ public sealed class MpvPlayer : IMediaPlayer
     public void FrameBackStep() => Command("frame-back-step");
     public void SetVolume(double volume) => Set("volume", Math.Clamp(volume, 0, 100).ToString(CultureInfo.InvariantCulture));
     public void SetMuted(bool muted) => Set("mute", muted ? "yes" : "no");
-    public void SetTrack(string kind, int? id) => Set(kind, id?.ToString() ?? "no");
+    public void SetTrack(string kind, int? id) => Set(kind, id?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "no");
     public void SetDeinterlace(bool value) => Set("deinterlace", value ? "yes" : "no");
 
     public byte[] RenderFrame(int width, int height)

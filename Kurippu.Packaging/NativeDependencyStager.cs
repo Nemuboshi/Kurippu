@@ -9,9 +9,9 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
     {
         var output = Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(output);
-        var prefix = (await RunRequired("brew", ["--prefix"], cancellationToken))
+        var prefix = (await RunRequired("brew", ["--prefix"], cancellationToken).ConfigureAwait(false))
             .Trim();
-        var mpvPrefix = (await RunRequired("brew", ["--prefix", "mpv"], cancellationToken))
+        var mpvPrefix = (await RunRequired("brew", ["--prefix", "mpv"], cancellationToken).ConfigureAwait(false))
             .Trim();
         var source = Path.Combine(mpvPrefix, "lib", "libmpv.dylib");
         if (!File.Exists(source))
@@ -34,7 +34,7 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
             File.Copy(real, target, overwrite: true);
             staged[real] = target;
 
-            foreach (var reference in await inspector.GetDependenciesAsync(real, cancellationToken))
+            foreach (var reference in await inspector.GetDependenciesAsync(real, cancellationToken).ConfigureAwait(false))
             {
                 if (reference.StartsWith("/usr/lib/", StringComparison.Ordinal) ||
                     reference.StartsWith("/System/", StringComparison.Ordinal))
@@ -60,20 +60,20 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
 
                 if (!File.Exists(candidate))
                     throw new PackagingException($"{reference} needed by {real} was not found.");
-                var dependency = await VisitAsync(candidate);
+                var dependency = await VisitAsync(candidate).ConfigureAwait(false);
                 await RunRequired("install_name_tool",
                     ["-change", reference, "@loader_path/" + Path.GetFileName(dependency), target],
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
             }
 
             await RunRequired("install_name_tool",
-                ["-id", "@loader_path/" + Path.GetFileName(target), target], cancellationToken);
+                ["-id", "@loader_path/" + Path.GetFileName(target), target], cancellationToken).ConfigureAwait(false);
             return target;
         }
 
-        await VisitAsync(source);
+        await VisitAsync(source).ConfigureAwait(false);
         foreach (var target in staged.Values)
-            await RunRequired("codesign", ["--force", "--sign", "-", target], cancellationToken);
+            await RunRequired("codesign", ["--force", "--sign", "-", target], cancellationToken).ConfigureAwait(false);
     }
 
     public async Task StageLinuxAsync(string outputDirectory,
@@ -98,18 +98,18 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
             File.Copy(file, target, overwrite: true);
 
             foreach (var dependency in await inspector.GetDependenciesAsync(file,
-                         cancellationToken))
+                         cancellationToken).ConfigureAwait(false))
             {
                 var dependencyName = Path.GetFileName(dependency);
                 if (IgnoredLinuxDependency().IsMatch(dependencyName)) continue;
-                await VisitAsync(dependency, dependencyName);
+                await VisitAsync(dependency, dependencyName).ConfigureAwait(false);
             }
 
             await RunRequired("patchelf", ["--set-rpath", "$ORIGIN", target],
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
 
-        await VisitAsync(source, "libmpv.so");
+        await VisitAsync(source, "libmpv.so").ConfigureAwait(false);
     }
 
     private static string? FindRPathDependency(string file, string name, string prefix,
@@ -126,7 +126,7 @@ public sealed partial class NativeDependencyStager(IProcessRunner processRunner)
     private async Task<string> RunRequired(string fileName,
         IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var result = await processRunner.RunAsync(fileName, arguments, cancellationToken);
+        var result = await processRunner.RunAsync(fileName, arguments, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
             throw MacNativeDependencyInspector.ProcessFailure(fileName, string.Join(' ', arguments),
                 result);

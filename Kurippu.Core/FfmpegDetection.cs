@@ -19,12 +19,12 @@ public static class FfmpegDetection
 
     public static bool ParseInterlace(string output) =>
         int.TryParse(Regex.Matches(output, @"lavfi\.idet\.multiple\.tff=(\d+)").LastOrDefault()?.Groups[1].Value,
-            out var count) && count > 3;
+System.Globalization.CultureInfo.InvariantCulture, out var count) && count > 3;
 
     public static CropRect? ParseCrop(string output)
     {
         int? Last(string key) => int.TryParse(Regex.Matches(output, $@"lavfi\.cropdetect\.{key}=(-?\d+)")
-            .LastOrDefault()?.Groups[1].Value, out var number) ? number : null;
+            .LastOrDefault()?.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var number) ? number : null;
         var w = Last("w"); var h = Last("h"); var x = Last("x"); var y = Last("y");
         return w is > 0 && h is > 0 && x is >= 0 && y is >= 0 ? new(w.Value, h.Value, x.Value, y.Value) : null;
     }

@@ -19,7 +19,7 @@ public static class VideoGeometry
         (double X, double Y, double Width, double Height) rect, string handle, double dx, double dy)
     {
         var (x, y, width, height) = rect;
-        if (handle == "move") return (x + dx, y + dy, width, height);
+        if (string.Equals(handle, "move", StringComparison.Ordinal)) return (x + dx, y + dy, width, height);
         if (handle.Contains('w')) { x += dx; width -= dx; }
         if (handle.Contains('e')) width += dx;
         if (handle.Contains('n')) { y += dy; height -= dy; }

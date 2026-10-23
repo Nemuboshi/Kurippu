@@ -16,14 +16,14 @@ public sealed class NativeDependencyStagerTests
 
         Assert.True(File.Exists(Path.Combine(fixture.Output, "libmpv.dylib")));
         Assert.True(File.Exists(Path.Combine(fixture.Output, "libavcodec.dylib")));
-        Assert.Contains(runner.Calls, call => call.FileName == "install_name_tool" &&
+        Assert.Contains(runner.Calls, call => string.Equals(call.FileName, "install_name_tool", StringComparison.Ordinal) &&
             call.Arguments.SequenceEqual(["-change", "@rpath/libavcodec.dylib",
                 "@loader_path/libavcodec.dylib",
                 Path.Combine(fixture.Output, "libmpv.dylib")]));
-        Assert.Contains(runner.Calls, call => call.FileName == "install_name_tool" &&
+        Assert.Contains(runner.Calls, call => string.Equals(call.FileName, "install_name_tool", StringComparison.Ordinal) &&
             call.Arguments.SequenceEqual(["-id", "@loader_path/libmpv.dylib",
                 Path.Combine(fixture.Output, "libmpv.dylib")]));
-        Assert.Equal(2, runner.Calls.Count(call => call.FileName == "codesign"));
+        Assert.Equal(2, runner.Calls.Count(call => string.Equals(call.FileName, "codesign", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public sealed class NativeDependencyStagerTests
         Assert.True(File.Exists(Path.Combine(fixture.Output, "libmpv.so")));
         Assert.True(File.Exists(Path.Combine(fixture.Output, "libavcodec.so.60")));
         Assert.False(File.Exists(Path.Combine(fixture.Output, "libc.so.6")));
-        Assert.Contains(runner.Calls, call => call.FileName == "patchelf" &&
+        Assert.Contains(runner.Calls, call => string.Equals(call.FileName, "patchelf", StringComparison.Ordinal) &&
             call.Arguments.SequenceEqual(["--set-rpath", "$ORIGIN",
                 Path.Combine(fixture.Output, "libavcodec.so.60")]));
     }
@@ -130,15 +130,15 @@ public sealed class NativeDependencyStagerTests
         public FakeProcessRunner CreateMacRunner() =>
             new(response: (fileName, arguments) =>
             {
-                if (fileName == "brew" && arguments.SequenceEqual(["--prefix"]))
+                if (string.Equals(fileName, "brew", StringComparison.Ordinal) && arguments.SequenceEqual(["--prefix"], StringComparer.Ordinal))
                     return new ProcessResult(0, Brew + Environment.NewLine, "");
-                if (fileName == "brew" && arguments.SequenceEqual(["--prefix", "mpv"]))
+                if (string.Equals(fileName, "brew", StringComparison.Ordinal) && arguments.SequenceEqual(["--prefix", "mpv"], StringComparer.Ordinal))
                     return new ProcessResult(0, Mpv + Environment.NewLine, "");
-                if (fileName == "otool" && arguments[1] == MacMpv)
+                if (string.Equals(fileName, "otool", StringComparison.Ordinal) && string.Equals(arguments[1], MacMpv, StringComparison.Ordinal))
                     return new ProcessResult(0,
                         $"{MacMpv}:\n    @rpath/libavcodec.dylib (compatibility version 1.0.0)\n" +
                         "    /usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n", "");
-                if (fileName == "otool" && arguments[1] == MacCodec)
+                if (string.Equals(fileName, "otool", StringComparison.Ordinal) && string.Equals(arguments[1], MacCodec, StringComparison.Ordinal))
                     return new ProcessResult(0,
                         $"{MacCodec}:\n    /usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n",
                         "");
@@ -148,11 +148,12 @@ public sealed class NativeDependencyStagerTests
         public FakeProcessRunner CreateLinuxRunner() =>
             new(response: (fileName, arguments) =>
             {
-                if (fileName == "ldd" && Path.GetFullPath(arguments[0]) == Path.GetFullPath(LinuxMpv))
+                if (string.Equals(fileName, "ldd", StringComparison.Ordinal) && string.Equals(Path.GetFullPath(arguments[0]), Path.GetFullPath(LinuxMpv), StringComparison.Ordinal))
                     return new ProcessResult(0,
                         $"    libavcodec.so.60 => {LinuxPosixCodec} (0x1)\n" +
                         $"    libc.so.6 => {LinuxPosixLibc} (0x2)\n", "");
-                if (fileName == "ldd" && Path.GetFullPath(arguments[0]) == Path.GetFullPath(LinuxCodec))
+                if (string.Equals(fileName, "ldd", StringComparison.Ordinal) &&
+                    string.Equals(Path.GetFullPath(arguments[0]), Path.GetFullPath(LinuxCodec), StringComparison.Ordinal))
                     return new ProcessResult(0,
                         $"    libc.so.6 => {LinuxPosixLibc} (0x2)\n", "");
                 return new ProcessResult(0, "", "");

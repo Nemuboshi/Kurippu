@@ -82,10 +82,10 @@ public partial class MainWindow : Window
         CropOverlay.CropChanged += crop =>
         {
             updatingCrop = true;
-            CropWidthBox.Text = crop?.Width.ToString() ?? "";
-            CropHeightBox.Text = crop?.Height.ToString() ?? "";
-            CropXBox.Text = crop?.X.ToString() ?? "";
-            CropYBox.Text = crop?.Y.ToString() ?? "";
+            CropWidthBox.Text = crop?.Width.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            CropHeightBox.Text = crop?.Height.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            CropXBox.Text = crop?.X.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            CropYBox.Text = crop?.Y.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
             updatingCrop = false;
             UpdateOptions();
         };
@@ -106,12 +106,14 @@ public partial class MainWindow : Window
         AudioCodecBox.SelectionChanged += (_, _) => OnAudioCodecChanged();
         SubtitlePathBox.TextChanged += (_, _) => UpdateSubtitleAvailability();
         foreach (var check in new[] { FixSarBox, BurnSubsBox })
-            check.PropertyChanged += (_, args) => {
+            check.PropertyChanged += (_, args) =>
+            {
                 if (args.Property == ToggleButton.IsCheckedProperty && player is not null && model.Editor is not null)
                     UpdateOptions();
             };
         foreach (var check in new[] { LimitModeBox, CrfModeBox, TwoPassBox })
-            check.PropertyChanged += (_, args) => {
+            check.PropertyChanged += (_, args) =>
+            {
                 if (args.Property == ToggleButton.IsCheckedProperty) OnModeChanged(check);
             };
         OutputBox.TextChanged += (_, _) => { if (!updatingOutput) autoOutputPath = false; };
@@ -119,7 +121,8 @@ public partial class MainWindow : Window
         VideoSurface.RenderRecovered += () => StatusText.Text = model.Status;
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DropEvent, OnDrop);
-        Closed += (_, _) => {
+        Closed += (_, _) =>
+        {
             sourceGeneration++;
             downloadCancellation?.Cancel(); encodeProgress?.Cancel(); detection.Dispose();
             logWindow?.Close();
@@ -131,7 +134,8 @@ public partial class MainWindow : Window
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Open video", AllowMultiple = false,
+            Title = "Open video",
+            AllowMultiple = false,
             FileTypeFilter = [new FilePickerFileType("Video") { Patterns = ["*.mkv", "*.mp4", "*.webm", "*.mov", "*.avi", "*.ts", "*.wmv"] }, FilePickerFileTypes.All]
         });
         if (files.Count > 0) await OpenSourceAsync(files[0].Path.LocalPath);
@@ -193,7 +197,7 @@ public partial class MainWindow : Window
             sourceTitle = choice.Title;
             sourceSaveAs = choice.SaveAs;
             await OpenSourceAsync(path, preserveSourceMetadata: true);
-            if (player is not null && model.Editor?.Media.Path == path) downloadedSource = path;
+            if (player is not null && string.Equals(model.Editor?.Media.Path, path, StringComparison.Ordinal)) downloadedSource = path;
             else sourceService.Release(path);
         }
         catch (OperationCanceledException) { StatusText.Text = "Download cancelled"; }
@@ -217,7 +221,7 @@ public partial class MainWindow : Window
         {
             VideoSurface.Player = null;
             player?.Dispose();
-            if (downloadedSource is { } previous && previous != path)
+            if (downloadedSource is { } previous && !string.Equals(previous, path, StringComparison.Ordinal))
             {
                 sourceService?.Release(previous);
                 downloadedSource = null;
@@ -354,7 +358,7 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("Detail log button is not left of the theme selector");
             logWindow.Close();
             activityLog.Clear();
-            if (player?.Property("pause") != "yes")
+            if (!string.Equals(player?.Property("pause"), "yes", StringComparison.Ordinal))
                 throw new InvalidOperationException("Opening a source started playback");
             if (SeekSlider.HighlightStart != 0 || Math.Abs(SeekSlider.HighlightEnd - model.Editor.Media.Duration) > .001)
                 throw new InvalidOperationException("Unmarked timeline is not fully highlighted");
@@ -364,7 +368,7 @@ public partial class MainWindow : Window
             OnMarkStart(null, null!);
             SeekSlider.Value = 2;
             OnMarkEnd(null, null!);
-            if (StartBox.Text != "00:00.500" || EndBox.Text != "00:02.000" ||
+            if (!string.Equals(StartBox.Text, "00:00.500", StringComparison.Ordinal) || !string.Equals(EndBox.Text, "00:02.000", StringComparison.Ordinal) ||
                 !StartBox.IsEffectivelyVisible || !EndBox.IsEffectivelyVisible)
                 throw new InvalidOperationException($"Fragment marks not visible next to transport: {StartBox.Text} - {EndBox.Text}");
             if (Math.Abs(SeekSlider.HighlightStart - .5) > .001 || Math.Abs(SeekSlider.HighlightEnd - 2) > .001)
@@ -375,19 +379,19 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("Editing a fragment time did not update the timeline");
             SeekSlider.Value = 1;
             PlayButton.RaiseEvent(new KeyEventArgs { RoutedEvent = KeyDownEvent, Key = Key.OemOpenBrackets });
-            if (StartBox.Text != "00:01.000")
+            if (!string.Equals(StartBox.Text, "00:01.000", StringComparison.Ordinal))
                 throw new InvalidOperationException("[ shortcut failed to mark start");
             SeekSlider.Value = 2;
             PlayButton.RaiseEvent(new KeyEventArgs { RoutedEvent = KeyDownEvent, Key = Key.OemCloseBrackets });
-            if (EndBox.Text != "00:02.000")
+            if (!string.Equals(EndBox.Text, "00:02.000", StringComparison.Ordinal))
                 throw new InvalidOperationException("] shortcut failed to mark end");
             SetEncodingControls(false);
             if (!PlayButton.IsEnabled) throw new InvalidOperationException("Playback disabled during encoding");
             OnPlayPause(null, null!);
-            if (player?.Property("pause") != "no")
+            if (!string.Equals(player?.Property("pause"), "no", StringComparison.Ordinal))
                 throw new InvalidOperationException("Playback cannot start during encoding");
             OnPlayPause(null, null!);
-            if (player?.Property("pause") != "yes")
+            if (!string.Equals(player?.Property("pause"), "yes", StringComparison.Ordinal))
                 throw new InvalidOperationException("Playback cannot pause during encoding");
             SetEncodingControls(true);
             using (var progress = new EncodeProgressSession())
@@ -437,7 +441,7 @@ public partial class MainWindow : Window
             var lightBackground = Background?.ToString();
             ThemeBox.SelectedIndex = 2;
             var darkBackground = Background?.ToString();
-            if (lightBackground == darkBackground)
+            if (string.Equals(lightBackground, darkBackground, StringComparison.Ordinal))
                 throw new InvalidOperationException("Workbench background did not follow theme selection");
             ThemeBox.SelectedIndex = 0;
             Exception? sizeError = null;
@@ -535,10 +539,10 @@ public partial class MainWindow : Window
     private void OnPlayPause(object? sender, RoutedEventArgs e)
     {
         if (player is null) return;
-        if (player.Property("pause") == "yes" && model.Editor is { } editor &&
+        if (string.Equals(player.Property("pause"), "yes", StringComparison.Ordinal) && model.Editor is { } editor &&
             PlaybackTimeline.ResumeTarget(SeekSlider.Value, editor.Media.Duration, LoopBox.IsChecked == true,
                 StartBox.Text ?? "", EndBox.Text ?? "") is { } target) player.Seek(target);
-        if (player.Property("pause") == "yes") player.Play(); else player.Pause();
+        if (string.Equals(player.Property("pause"), "yes", StringComparison.Ordinal)) player.Play(); else player.Pause();
     }
     private void OnFrameStep(object? sender, RoutedEventArgs e) => player?.FrameStep();
     private void OnFrameBackStep(object? sender, RoutedEventArgs e) => player?.FrameBackStep();
@@ -578,7 +582,7 @@ public partial class MainWindow : Window
         if (player is null || e.Source is TextBox) return;
         if (PlaybackShortcuts.MarkFor(e.Key) is { } mark)
         {
-            if (mark == "start") OnMarkStart(sender, e);
+            if (string.Equals(mark, "start", StringComparison.Ordinal)) OnMarkStart(sender, e);
             else OnMarkEnd(sender, e);
             e.Handled = true;
             return;
@@ -608,14 +612,21 @@ public partial class MainWindow : Window
     }
     private async void OnOutputFile(object? sender, RoutedEventArgs e)
     {
-        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Save output",
-            SuggestedFileName = Path.GetFileName(OutputBox.Text) });
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save output",
+            SuggestedFileName = Path.GetFileName(OutputBox.Text)
+        });
         if (file is not null) OutputBox.Text = file.Path.LocalPath;
     }
     private async void OnPreviewFile(object? sender, RoutedEventArgs e)
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Preview image",
-            AllowMultiple = false, FileTypeFilter = [new FilePickerFileType("Images") { Patterns = ["*.jpg", "*.jpeg", "*.png"] }] });
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Preview image",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("Images") { Patterns = ["*.jpg", "*.jpeg", "*.png"] }]
+        });
         if (files.Count > 0) { PreviewPathBox.Text = files[0].Path.LocalPath; PreviewTimeBox.Text = ""; }
     }
 
@@ -734,7 +745,7 @@ public partial class MainWindow : Window
         editor.Refresh();
         RefreshOutputPath();
         CropOverlay.SetCrop(editor.VisibleCrop);
-        if (RawArgumentsBox.Text != editor.RawArguments) RawArgumentsBox.Text = editor.RawArguments;
+        if (!string.Equals(RawArgumentsBox.Text, editor.RawArguments, StringComparison.Ordinal)) RawArgumentsBox.Text = editor.RawArguments;
         ValidationText.Text = string.Join("; ", editor.Errors.Select(error => $"{error.Field}: {error.Message}"));
         player?.SetDeinterlace(o.Deinterlace);
         if (editor.Media.VideoTracks.Count > o.VideoTrack) player?.SetTrack("vid", editor.Media.VideoTracks[o.VideoTrack].Id);

@@ -27,7 +27,7 @@ public sealed class PackagingCommand(
 
         var output = Path.GetFullPath(args[2]);
         Directory.CreateDirectory(output);
-        await stager.StageAsync(rid, output, cancellationToken);
+        await stager.StageAsync(rid, output, cancellationToken).ConfigureAwait(false);
         (cleanSymbols ?? ReleaseSymbolCleaner.RemoveDebugSymbols)(output);
         Console.WriteLine($"Runtime assets ready: {rid} -> {output}");
         return 0;

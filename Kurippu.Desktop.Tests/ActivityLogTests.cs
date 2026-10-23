@@ -9,7 +9,7 @@ public class ActivityLogTests
     {
         var log = new ActivityLog();
         var changes = 0;
-        log.PropertyChanged += (_, args) => { if (args.PropertyName == nameof(ActivityLog.Text)) changes++; };
+        log.PropertyChanged += (_, args) => { if (string.Equals(args.PropertyName, nameof(ActivityLog.Text), StringComparison.Ordinal)) changes++; };
 
         log.AppendLine("First");
         log.AppendLine("Second");

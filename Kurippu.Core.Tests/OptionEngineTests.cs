@@ -25,7 +25,7 @@ public class OptionEngineTests
     public void SubtitleBurnWithoutSourceExplainsBothPossibleSources()
     {
         var plan = OptionEngine.Derive(new OptionInputs { BurnSubtitles = true }, Media);
-        Assert.Contains(plan.Errors, error => error.Field == "strack" &&
+        Assert.Contains(plan.Errors, error => string.Equals(error.Field, "strack", StringComparison.Ordinal) &&
             error.Message.Contains("embedded") && error.Message.Contains("external"));
     }
 
@@ -33,9 +33,13 @@ public class OptionEngineTests
     public void MissingExternalSubtitlesBlockBurnEvenWithEmbeddedTrackSelected()
     {
         var media = Media with { SubtitleTracks = [new(3, "sub", "subrip")] };
-        var plan = OptionEngine.Derive(new OptionInputs { BurnSubtitles = true, SubtitleTrack = 0,
-            SubtitlePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".srt") }, media);
-        Assert.Contains(plan.Errors, error => error.Field == "strack" && error.Message.Contains("external"));
+        var plan = OptionEngine.Derive(new OptionInputs
+        {
+            BurnSubtitles = true,
+            SubtitleTrack = 0,
+            SubtitlePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".srt")
+        }, media);
+        Assert.Contains(plan.Errors, error => string.Equals(error.Field, "strack", StringComparison.Ordinal) && error.Message.Contains("external"));
     }
 
     [Fact]
@@ -46,13 +50,17 @@ public class OptionEngineTests
         {
             File.WriteAllText(path, "1\n00:00:00,000 --> 00:00:01,000\nHello");
             var media = Media with { SubtitleTracks = [new(3, "sub", "hdmv_pgs_subtitle")] };
-            var plan = OptionEngine.Derive(new OptionInputs { BurnSubtitles = true,
-                SubtitleTrack = 0, SubtitlePath = path }, media);
+            var plan = OptionEngine.Derive(new OptionInputs
+            {
+                BurnSubtitles = true,
+                SubtitleTrack = 0,
+                SubtitlePath = path
+            }, media);
             Assert.True(plan.IsValid);
             Assert.False(plan.Options!.GraphicSubtitles);
             var args = FfmpegArguments.Build(plan.Options);
             Assert.Contains(args, item => item.Contains("subtitles='"));
-            Assert.DoesNotContain("-filter_complex", args);
+            Assert.DoesNotContain("-filter_complex", args, StringComparer.Ordinal);
         }
         finally { File.Delete(path); }
     }
@@ -60,10 +68,14 @@ public class OptionEngineTests
     [Fact]
     public void ThreadCountIsEditableAndInvalidValuesBlockEncoding()
     {
-        Assert.Equal(4, OptionEngine.Derive(new OptionInputs { Threads = "4", VideoCodec = "vp9",
-            Multithreading = "tile-col" }, Media).Options!.Threads);
+        Assert.Equal(4, OptionEngine.Derive(new OptionInputs
+        {
+            Threads = "4",
+            VideoCodec = "vp9",
+            Multithreading = "tile-col"
+        }, Media).Options!.Threads);
         Assert.Contains(OptionEngine.Derive(new OptionInputs { Threads = "0" }, Media).Errors,
-            error => error.Field == "threads");
+            error => string.Equals(error.Field, "threads", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -74,7 +86,7 @@ public class OptionEngineTests
         Assert.Equal(640, valid.Options!.FinalWidth);
         Assert.Equal(360, valid.Options.FinalHeight);
         Assert.Contains(OptionEngine.Derive(new OptionInputs { VideoTrack = 1, CropWidth = "800" }, multi).Errors,
-            error => error.Field == "cropx");
+            error => string.Equals(error.Field, "cropx", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -93,9 +105,12 @@ public class OptionEngineTests
     {
         var result = OptionEngine.Derive(new OptionInputs
         {
-            CropWidth = width, CropHeight = height, CropX = x, CropY = y
+            CropWidth = width,
+            CropHeight = height,
+            CropX = x,
+            CropY = y
         }, Media);
-        Assert.Contains(result.Errors, error => error.Field == field && error.Message.Contains("even"));
+        Assert.Contains(result.Errors, error => string.Equals(error.Field, field, StringComparison.Ordinal) && error.Message.Contains("even"));
         Assert.Null(result.Options);
     }
 
@@ -105,7 +120,7 @@ public class OptionEngineTests
     public void OddExplicitScaleDimensionsBlockEncoding(string width, string height, string field)
     {
         var result = OptionEngine.Derive(new OptionInputs { ScaleWidth = width, ScaleHeight = height }, Media);
-        Assert.Contains(result.Errors, error => error.Field == field && error.Message.Contains("even"));
+        Assert.Contains(result.Errors, error => string.Equals(error.Field, field, StringComparison.Ordinal) && error.Message.Contains("even"));
         Assert.Null(result.Options);
     }
 
@@ -128,10 +143,18 @@ public class OptionEngineTests
     [Fact]
     public void PartialCropOnOddSourceKeepsImplicitDimensionsEven()
     {
-        var source = Media with { Width = 321, Height = 181,
-            VideoTracks = [new MediaTrack(1, "video", "h264", 321, 181)] };
-        var result = OptionEngine.Derive(new OptionInputs { CropWidth = "320",
-            ScaleWidth = "320", ScaleHeight = "180" }, source);
+        var source = Media with
+        {
+            Width = 321,
+            Height = 181,
+            VideoTracks = [new MediaTrack(1, "video", "h264", 321, 181)]
+        };
+        var result = OptionEngine.Derive(new OptionInputs
+        {
+            CropWidth = "320",
+            ScaleWidth = "320",
+            ScaleHeight = "180"
+        }, source);
         Assert.Empty(result.Errors);
         Assert.Equal(new CropRect(320, 180, 0, 0), result.Options!.Crop);
     }
@@ -141,7 +164,7 @@ public class OptionEngineTests
     {
         var mp3 = Media with { AudioTracks = [new MediaTrack(2, "audio", "mp3", Channels: 2)] };
         var result = OptionEngine.Derive(new OptionInputs { AudioCodec = "copy" }, mp3);
-        Assert.Contains(result.Errors, error => error.Field == "acodec");
+        Assert.Contains(result.Errors, error => string.Equals(error.Field, "acodec", StringComparison.Ordinal));
         Assert.Null(result.Options);
     }
 
@@ -173,7 +196,7 @@ public class OptionEngineTests
     public void InvalidFragmentCannotProduceEncodeArguments()
     {
         var result = OptionEngine.Derive(new OptionInputs { Start = "90", End = "40" }, Media);
-        Assert.Contains(result.Errors, error => error.Field == "end");
+        Assert.Contains(result.Errors, error => string.Equals(error.Field, "end", StringComparison.Ordinal));
         Assert.Null(result.Options);
     }
 
@@ -181,7 +204,7 @@ public class OptionEngineTests
     public void CropOutsideSourceIsRejected()
     {
         var result = OptionEngine.Derive(new OptionInputs { CropWidth = "100", CropX = "1900" }, Media);
-        Assert.Contains(result.Errors, error => error.Field == "cropx");
+        Assert.Contains(result.Errors, error => string.Equals(error.Field, "cropx", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -195,6 +218,6 @@ public class OptionEngineTests
     public void Mp4RejectsVorbisAudioBeforeFfmpegStarts()
     {
         var result = OptionEngine.Derive(new OptionInputs { VideoCodec = "x264", AudioCodec = "vorbis" }, Media);
-        Assert.Contains(result.Errors, error => error.Field == "acodec");
+        Assert.Contains(result.Errors, error => string.Equals(error.Field, "acodec", StringComparison.Ordinal));
     }
 }

@@ -14,15 +14,18 @@ public sealed class FakeAssetDownloader(
         Calls.Add((source, destination, sha256));
         if (failure is not null) throw failure;
         if (sources is not null && sources.TryGetValue(source.AbsoluteUri, out var local))
-            await CopyAsync(local, destination, cancellationToken);
+            await CopyAsync(local, destination, cancellationToken).ConfigureAwait(false);
         else
-            await File.WriteAllTextAsync(destination, "fake", cancellationToken);
+            await File.WriteAllTextAsync(destination, "fake", cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task CopyAsync(string source, string destination, CancellationToken cancellationToken)
     {
-        await using var input = File.OpenRead(source);
-        await using var output = File.Create(destination);
-        await input.CopyToAsync(output, cancellationToken);
+        var input = File.OpenRead(source);
+        await using (input.ConfigureAwait(false))
+        {
+            await using var output = File.Create(destination);
+            await input.CopyToAsync(output, cancellationToken);
+        }
     }
 }

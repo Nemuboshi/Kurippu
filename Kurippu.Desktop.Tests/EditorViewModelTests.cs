@@ -103,7 +103,7 @@ public class EditorViewModelTests
         editor.Refresh();
         Assert.False(editor.CanEncode);
         Assert.Same(media, editor.Media);
-        Assert.Contains(editor.Errors, error => error.Field == "end");
+        Assert.Contains(editor.Errors, error => string.Equals(error.Field, "end", StringComparison.Ordinal));
     }
 
     [Fact]

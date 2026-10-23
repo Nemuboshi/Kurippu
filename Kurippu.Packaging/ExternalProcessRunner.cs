@@ -40,9 +40,9 @@ public sealed class ExternalProcessRunner : IProcessRunner
 
         var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var result = new ProcessResult(process.ExitCode, await standardOutput,
-            await standardError);
+        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        var result = new ProcessResult(process.ExitCode, await standardOutput.ConfigureAwait(false),
+            await standardError.ConfigureAwait(false));
         cancellationToken.ThrowIfCancellationRequested();
         if (result.ExitCode != 0)
             throw MacNativeDependencyInspector.ProcessFailure(fileName,

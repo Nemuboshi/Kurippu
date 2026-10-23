@@ -63,8 +63,8 @@ public sealed class EditorViewModel : INotifyPropertyChanged
 
     public void SelectAudioCodec(string codec)
     {
-        if (codec == "copy" && !CopyAvailable) codec = "aac";
-        if (codec != Options.AudioCodec) Options.AudioBitrate = "";
+        if (string.Equals(codec, "copy", StringComparison.Ordinal) && !CopyAvailable) codec = "aac";
+        if (!string.Equals(codec, Options.AudioCodec, StringComparison.Ordinal)) Options.AudioBitrate = "";
         Options.AudioCodec = codec;
         Refresh();
     }
@@ -78,7 +78,7 @@ public sealed class EditorViewModel : INotifyPropertyChanged
         if (Plan.IsValid)
         {
             var generated = FfmpegArguments.FormatRaw(FfmpegArguments.Build(Plan.Options!));
-            if (generated != lastAutoArguments)
+            if (!string.Equals(generated, lastAutoArguments, StringComparison.Ordinal))
             {
                 RawArguments = generated;
                 lastAutoArguments = generated;

@@ -8,7 +8,7 @@ public sealed partial class LinuxNativeDependencyInspector(IProcessRunner proces
     public async Task<IReadOnlyList<string>> GetDependenciesAsync(string file,
         CancellationToken cancellationToken)
     {
-        var result = await processRunner.RunAsync("ldd", [file], cancellationToken);
+        var result = await processRunner.RunAsync("ldd", [file], cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
             throw MacNativeDependencyInspector.ProcessFailure("ldd", file, result);
         if (result.StandardOutput.Contains("not found", StringComparison.Ordinal))

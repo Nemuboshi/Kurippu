@@ -13,7 +13,7 @@ public sealed record SourceChoices(string Url, string Title, IReadOnlyList<Forma
             for (var i = 0; i < Subtitles.Count; i++)
                 if (Subtitles[i].Id is "en" or "eng" or "en-US" or "en_US") return i;
             for (var i = 0; i < Subtitles.Count; i++)
-                if (Subtitles[i].Id == "none") return i;
+                if (string.Equals(Subtitles[i].Id, "none", StringComparison.Ordinal)) return i;
             return -1;
         }
     }
@@ -45,7 +45,7 @@ public sealed class SourceService(IProcessRunner runner, string ytDlp, string? f
                 $"{Text(f, "vcodec")} {Number(f, "width"):0}x{Number(f, "height"):0} {Number(f, "fps"):0}fps"))
             .ToArray();
         if (videos.Length == 0) throw new InvalidDataException("No video formats available");
-        var audios = formats.Where(f => Text(f, "vcodec") == "none" && Text(f, "acodec") is not ("" or "none"))
+        var audios = formats.Where(f => string.Equals(Text(f, "vcodec"), "none", StringComparison.Ordinal) && Text(f, "acodec") is not ("" or "none"))
             .OrderByDescending(f => Number(f, "abr"))
             .Select(f => new FormatChoice(Text(f, "format_id"), $"{Text(f, "acodec")} {Number(f, "abr"):0}kbit/s"))
             .Append(new FormatChoice("none", "None")).ToArray();
@@ -68,10 +68,10 @@ public sealed class SourceService(IProcessRunner runner, string ytDlp, string? f
         try
         {
             var args = new List<string> { "--no-part", "--no-playlist", "--newline", "--format",
-                audioId == "none" ? videoId : videoId + "+" + audioId,
+string.Equals(audioId, "none", StringComparison.Ordinal) ? videoId : videoId + "+" + audioId,
                 "--merge-output-format", "mkv" };
             if (ffmpeg is not null) args.AddRange(["--ffmpeg-location", ffmpeg]);
-            if (subtitleId != "none") args.AddRange(["--sub-langs", subtitleId, "--write-subs", "--embed-subs"]);
+            if (!string.Equals(subtitleId, "none", StringComparison.Ordinal)) args.AddRange(["--sub-langs", subtitleId, "--write-subs", "--embed-subs"]);
             args.AddRange(["--output", output, "--", url]);
             var result = await runner.RunAsync(ytDlp, args, log, cancellationToken);
             if (result != 0) throw new InvalidOperationException($"yt-dlp download failed ({result})");

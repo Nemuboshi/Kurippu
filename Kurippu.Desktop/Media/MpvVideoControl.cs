@@ -62,7 +62,7 @@ public sealed class MpvVideoControl : Control, IDisposable
             TimeChanged?.Invoke(player.Numeric("time-pos"));
         }
         catch (ObjectDisposedException) { }
-        catch (ArgumentOutOfRangeException ex) when (ex.ParamName == "width")
+        catch (ArgumentOutOfRangeException ex) when (string.Equals(ex.ParamName, "width", StringComparison.Ordinal))
         {
             if (!oversized) { oversized = true; RenderFailed?.Invoke(ex); }
         }

@@ -28,7 +28,7 @@ public static class RuntimeSmoke
                 throw new InvalidDataException("libmpv software frame is missing");
             player.Pause();
             player.SetMuted(true);
-            if (player.Property("mute") != "yes") throw new InvalidDataException("libmpv mute failed");
+            if (!string.Equals(player.Property("mute"), "yes", StringComparison.Ordinal)) throw new InvalidDataException("libmpv mute failed");
             player.SetMuted(false);
             player.FrameBackStep();
             var detectionVideo = Path.Combine(directory, "detect.mp4");
@@ -40,8 +40,15 @@ public static class RuntimeSmoke
                 detectionVideo, 0, 0, CancellationToken.None);
             if (detected is null || detected.Width != 320 || detected.Height != 180)
                 throw new InvalidDataException("FFmpeg crop detection failed");
-            var options = new EncodeOptions { InputPath = video, HasAudio = false,
-                Duration = 1, VideoCodec = "x264", FinalWidth = 320, FinalHeight = 180 };
+            var options = new EncodeOptions
+            {
+                InputPath = video,
+                HasAudio = false,
+                Duration = 1,
+                VideoCodec = "x264",
+                FinalWidth = 320,
+                FinalHeight = 180
+            };
             var output = Path.Combine(directory, "output.mp4");
             var encoder = new EncodeService(new ProcessRunner(), ffmpeg);
             await encoder.EncodeAsync(options, output,

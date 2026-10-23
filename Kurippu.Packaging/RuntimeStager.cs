@@ -20,12 +20,12 @@ public sealed class RuntimeStager(
         {
             var ffmpegArchive = Path.Combine(scratch, asset.Ffmpeg.FileName);
             await downloader.DownloadAsync(new Uri(asset.Ffmpeg.Url), ffmpegArchive,
-                asset.Ffmpeg.Sha256, cancellationToken);
+                asset.Ffmpeg.Sha256, cancellationToken).ConfigureAwait(false);
             var ffmpegExtracted = Path.Combine(scratch, "ffmpeg");
             Directory.CreateDirectory(ffmpegExtracted);
             ArchiveExtractor.ExtractToDirectory(ffmpegArchive, ffmpegExtracted);
 
-            var executableName = rid == "win-x64" ? "ffmpeg.exe" : "ffmpeg";
+            var executableName = string.Equals(rid, "win-x64", StringComparison.Ordinal) ? "ffmpeg.exe" : "ffmpeg";
             var source = Directory.EnumerateFiles(ffmpegExtracted, executableName,
                 SearchOption.AllDirectories).FirstOrDefault()
                 ?? throw new PackagingException($"Archive did not contain {executableName}.");
@@ -36,19 +36,19 @@ public sealed class RuntimeStager(
                     UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
                     UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
 
-            var result = await processRunner.RunAsync(target, ["-version"], cancellationToken);
+            var result = await processRunner.RunAsync(target, ["-version"], cancellationToken).ConfigureAwait(false);
             if (result.ExitCode != 0)
                 throw new PackagingException($"ffmpeg -version failed for {target}: " +
                     $"exit {result.ExitCode}{FormatOutput(result)}");
 
-            if (rid == "win-x64")
-                await StageWindowsMpv(asset, output, scratch, cancellationToken);
+            if (string.Equals(rid, "win-x64", StringComparison.Ordinal))
+                await StageWindowsMpv(asset, output, scratch, cancellationToken).ConfigureAwait(false);
             else if (nativeDependencyStager is not null)
             {
                 if (rid.StartsWith("osx-", StringComparison.Ordinal))
-                    await nativeDependencyStager.StageMacOSAsync(output, cancellationToken);
+                    await nativeDependencyStager.StageMacOSAsync(output, cancellationToken).ConfigureAwait(false);
                 else
-                    await nativeDependencyStager.StageLinuxAsync(output, cancellationToken);
+                    await nativeDependencyStager.StageLinuxAsync(output, cancellationToken).ConfigureAwait(false);
             }
         }
         finally
@@ -62,7 +62,7 @@ public sealed class RuntimeStager(
         if (rid.StartsWith("osx-", StringComparison.Ordinal) && !OperatingSystem.IsMacOS())
             throw new PackagingException(
                 $"RID {rid} must be packaged on macOS; current host is {CurrentHost()}.");
-        if (rid == "linux-x64" && !OperatingSystem.IsLinux())
+        if (string.Equals(rid, "linux-x64", StringComparison.Ordinal) && !OperatingSystem.IsLinux())
             throw new PackagingException(
                 $"RID {rid} must be packaged on Linux; current host is {CurrentHost()}.");
     }
@@ -80,7 +80,7 @@ public sealed class RuntimeStager(
     {
         var mpv = asset.Mpv ?? throw new PackagingException("Windows mpv asset metadata is missing.");
         var archive = Path.Combine(scratch, mpv.FileName);
-        await downloader.DownloadAsync(new Uri(mpv.Url), archive, mpv.Sha256, cancellationToken);
+        await downloader.DownloadAsync(new Uri(mpv.Url), archive, mpv.Sha256, cancellationToken).ConfigureAwait(false);
         var extracted = Path.Combine(scratch, "mpv");
         Directory.CreateDirectory(extracted);
         ArchiveExtractor.ExtractToDirectory(archive, extracted);

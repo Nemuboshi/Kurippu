@@ -8,7 +8,7 @@ public sealed partial class MacNativeDependencyInspector(IProcessRunner processR
     public async Task<IReadOnlyList<string>> GetDependenciesAsync(string file,
         CancellationToken cancellationToken)
     {
-        var result = await processRunner.RunAsync("otool", ["-L", file], cancellationToken);
+        var result = await processRunner.RunAsync("otool", ["-L", file], cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
             throw ProcessFailure("otool -L", file, result);
 

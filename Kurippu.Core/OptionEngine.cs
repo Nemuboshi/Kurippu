@@ -87,9 +87,12 @@ public static class OptionEngine
         if (input.VideoTrack >= 0 && input.VideoTrack < media.VideoTracks.Count)
         {
             var track = media.VideoTracks[input.VideoTrack];
-            media = media with { Width = track.Width > 0 ? track.Width : media.Width,
+            media = media with
+            {
+                Width = track.Width > 0 ? track.Width : media.Width,
                 Height = track.Height > 0 ? track.Height : media.Height,
-                Sar = track.Sar > 0 ? track.Sar : media.Sar };
+                Sar = track.Sar > 0 ? track.Sar : media.Sar
+            };
         }
         var errors = new List<FieldError>();
         var warnings = new List<string>();
@@ -121,12 +124,12 @@ public static class OptionEngine
         if (duration <= 0) errors.Add(new("end", "empty fragment"));
         if (input.VideoCodec is not ("x264" or "vp8" or "vp9" or "av1")) errors.Add(new("vcodec", "unsupported video codec"));
         if (input.AudioCodec is not ("aac" or "opus" or "vorbis" or "copy")) errors.Add(new("acodec", "unsupported audio codec"));
-        if (input.VideoCodec == "x264" && input.AudioCodec is "opus" or "vorbis" && input.HasAudio)
+        if (string.Equals(input.VideoCodec, "x264", StringComparison.Ordinal) && input.AudioCodec is "opus" or "vorbis" && input.HasAudio)
             errors.Add(new("acodec", "MP4 requires AAC or a compatible copied track"));
         if (input.VideoTrack < 0 || input.VideoTrack >= media.VideoTracks.Count) errors.Add(new("vtrack", "select a video track"));
         var hasAudio = input.HasAudio && media.AudioTracks.Count > 0;
         if (hasAudio && (input.AudioTrack < 0 || input.AudioTrack >= media.AudioTracks.Count)) errors.Add(new("atrack", "select an audio track"));
-        if (hasAudio && input.AudioCodec == "copy" && input.AudioTrack >= 0 && input.AudioTrack < media.AudioTracks.Count &&
+        if (hasAudio && string.Equals(input.AudioCodec, "copy", StringComparison.Ordinal) && input.AudioTrack >= 0 && input.AudioTrack < media.AudioTracks.Count &&
             media.AudioTracks[input.AudioTrack].Codec is not ("aac" or "vorbis" or "opus"))
             errors.Add(new("acodec", "selected audio track cannot be copied"));
         if (input.BurnSubtitles)
@@ -138,17 +141,17 @@ public static class OptionEngine
             else if (input.SubtitleTrack is null || input.SubtitleTrack < 0 || input.SubtitleTrack >= media.SubtitleTracks.Count)
                 errors.Add(new("strack", "select an embedded subtitle track or an external subtitle file"));
         }
-        var quality = IntField(input.Quality, "quality", 0, input.VideoCodec == "x264" ? 51 : 63, errors);
-        if (input.CrfMode) quality ??= input.VideoCodec == "x264" ? 23 : 25;
-        double? ab = input.AudioCodec == "copy" || !hasAudio ? null :
-            NumberField(input.AudioBitrate, "ab", input.AudioCodec == "vorbis" ? -1 : input.AudioCodec == "aac" ? 128 : 6,
-                input.AudioCodec == "vorbis" ? 10 : input.AudioCodec == "aac" ? 768 : 510, errors)
-            ?? (input.AudioCodec == "vorbis" ? 4 : 128);
+        var quality = IntField(input.Quality, "quality", 0, string.Equals(input.VideoCodec, "x264", StringComparison.Ordinal) ? 51 : 63, errors);
+        if (input.CrfMode) quality ??= string.Equals(input.VideoCodec, "x264", StringComparison.Ordinal) ? 23 : 25;
+        double? ab = string.Equals(input.AudioCodec, "copy", StringComparison.Ordinal) || !hasAudio ? null :
+            NumberField(input.AudioBitrate, "ab", string.Equals(input.AudioCodec, "vorbis", global::System.StringComparison.Ordinal) ? -1 : string.Equals(input.AudioCodec, "aac", global::System.StringComparison.Ordinal) ? 128 : 6,
+string.Equals(input.AudioCodec, "vorbis", global::System.StringComparison.Ordinal) ? 10 : string.Equals(input.AudioCodec, "aac", global::System.StringComparison.Ordinal) ? 768 : 510, errors)
+            ?? (string.Equals(input.AudioCodec, "vorbis", global::System.StringComparison.Ordinal) ? 4 : 128);
         var limit = input.CrfMode ? 0 : NumberField(input.Limit, "limit", input.LimitMode ? .001 : 1, double.MaxValue, errors)
             ?? (input.LimitMode ? 19 : 5000);
-        var amp = input.AudioCodec == "copy" ? null : NumberField(input.Amplify, "amplify", 1, 64, errors);
-        var fadeIn = input.AudioCodec == "copy" ? null : NumberField(input.FadeIn, "fadeIn", .001, double.MaxValue, errors);
-        var fadeOut = input.AudioCodec == "copy" ? null : NumberField(input.FadeOut, "fadeOut", .001, double.MaxValue, errors);
+        var amp = string.Equals(input.AudioCodec, "copy", StringComparison.Ordinal) ? null : NumberField(input.Amplify, "amplify", 1, 64, errors);
+        var fadeIn = string.Equals(input.AudioCodec, "copy", StringComparison.Ordinal) ? null : NumberField(input.FadeIn, "fadeIn", .001, double.MaxValue, errors);
+        var fadeOut = string.Equals(input.AudioCodec, "copy", StringComparison.Ordinal) ? null : NumberField(input.FadeOut, "fadeOut", .001, double.MaxValue, errors);
         var sar = media.Sar > 0 ? media.Sar : 1;
         var w = hasCrop ? effectiveWidth : media.Width;
         var h = hasCrop ? effectiveHeight : media.Height;
@@ -162,28 +165,48 @@ public static class OptionEngine
         if (finalHeight % 2 != 0 && scaleh is null) errors.Add(new("height", "output height must be even"));
         if (sar != 1 && !input.FixSar) warnings.Add("Anamorphic source: fix SAR to preserve aspect ratio");
         if (duration < 6 && !input.CrfMode) warnings.Add("Consider CRF mode for a short fragment");
-        var audioRate = input.AudioCodec == "copy" ? 320 : input.AudioCodec == "vorbis" ? 128 : ab ?? 0;
+        var audioRate = string.Equals(input.AudioCodec, "copy", StringComparison.Ordinal) ? 320 : string.Equals(input.AudioCodec, "vorbis", StringComparison.Ordinal) ? 128 : ab ?? 0;
         var vb = input.CrfMode ? null : input.LimitMode
             ? Math.Max(1, (int)Math.Floor(limit * 8 * 1024 / Math.Max(duration, .001) - (hasAudio ? audioRate : 0)))
             : (int?)Math.Floor(limit);
-        var container = input.VideoCodec == "x264" ? "mp4" : "webm";
+        var container = string.Equals(input.VideoCodec, "x264", StringComparison.Ordinal) ? "mp4" : "webm";
         if (errors.Count > 0) return new(null, errors, warnings, container);
         var graphic = input.BurnSubtitles && string.IsNullOrWhiteSpace(input.SubtitlePath) && input.SubtitleTrack is { } index &&
             !new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ass", "ssa", "subrip", "srt", "mov_text", "webvtt", "text" }
                 .Contains(media.SubtitleTracks[index].Codec);
         return new(new EncodeOptions
         {
-            InputPath = media.Path, Start = start, End = end, Duration = duration, HasAudio = hasAudio,
-            VideoTrack = input.VideoTrack, AudioTrack = input.AudioTrack, VideoCodec = input.VideoCodec,
-            AudioCodec = input.AudioCodec, Threads = threadCount,
-            VideoBitrate = vb, Quality = quality, Preset = input.Preset, Multithreading = input.Multithreading,
+            InputPath = media.Path,
+            Start = start,
+            End = end,
+            Duration = duration,
+            HasAudio = hasAudio,
+            VideoTrack = input.VideoTrack,
+            AudioTrack = input.AudioTrack,
+            VideoCodec = input.VideoCodec,
+            AudioCodec = input.AudioCodec,
+            Threads = threadCount,
+            VideoBitrate = vb,
+            Quality = quality,
+            Preset = input.Preset,
+            Multithreading = input.Multithreading,
             Deinterlace = input.Deinterlace,
             Crop = hasCrop ? new(effectiveWidth, effectiveHeight, effectiveX, effectiveY) : null,
-            ScaleWidth = scalew, ScaleHeight = scaleh, FinalWidth = finalWidth, FinalHeight = finalHeight,
-            FixSar = input.FixSar, Anamorphic = sar != 1, BurnSubtitles = input.BurnSubtitles,
-            GraphicSubtitles = graphic, SubtitlePath = string.IsNullOrWhiteSpace(input.SubtitlePath) ? null : input.SubtitlePath,
-            SubtitleTrack = input.SubtitleTrack, AudioChannels = hasAudio ? media.AudioTracks[input.AudioTrack].Channels : 0,
-            Amplify = amp, FadeIn = fadeIn, FadeOut = fadeOut, AudioBitrate = ab
+            ScaleWidth = scalew,
+            ScaleHeight = scaleh,
+            FinalWidth = finalWidth,
+            FinalHeight = finalHeight,
+            FixSar = input.FixSar,
+            Anamorphic = sar != 1,
+            BurnSubtitles = input.BurnSubtitles,
+            GraphicSubtitles = graphic,
+            SubtitlePath = string.IsNullOrWhiteSpace(input.SubtitlePath) ? null : input.SubtitlePath,
+            SubtitleTrack = input.SubtitleTrack,
+            AudioChannels = hasAudio ? media.AudioTracks[input.AudioTrack].Channels : 0,
+            Amplify = amp,
+            FadeIn = fadeIn,
+            FadeOut = fadeOut,
+            AudioBitrate = ab
         }, errors, warnings, container);
     }
 

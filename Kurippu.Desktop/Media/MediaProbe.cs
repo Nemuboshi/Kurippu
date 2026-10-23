@@ -21,7 +21,7 @@ public static class MediaProbe
             var width = Integer(prefix + "demux-w");
             var height = Integer(prefix + "demux-h");
             var sar = Floating(prefix + "demux-par");
-            if (kind == "video" && videos.Count == 0)
+            if (string.Equals(kind, "video", StringComparison.Ordinal) && videos.Count == 0)
             {
                 if (width <= 0) width = Integer("video-params/w");
                 if (height <= 0) height = Integer("video-params/h");

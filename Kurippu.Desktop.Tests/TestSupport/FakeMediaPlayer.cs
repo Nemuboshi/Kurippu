@@ -30,7 +30,7 @@ public sealed class FakeMediaPlayer : IMediaPlayer
         open.TrySetResult(new MediaInfo(source, 3, 320, 180, 1,
             [new MediaTrack(1, "video", "h264", 320, 180)], [], []));
 
-    public string Property(string name) => name == "pause" ? "yes" : "";
+    public string Property(string name) => string.Equals(name, "pause", StringComparison.Ordinal) ? "yes" : "";
     public double Numeric(string name) => 0;
     public void Play() { }
     public void Pause() { }

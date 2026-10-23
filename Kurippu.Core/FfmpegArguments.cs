@@ -48,7 +48,7 @@ public static class FfmpegArguments
         var a = new List<string>();
         if (o.Start is { } start) a.AddRange(["-ss", Number(start)]);
         a.AddRange(["-i", FileArg(o.InputPath)]);
-        if (o.Start is not null && o.HasAudio && o.AudioCodec == "copy") a.AddRange(["-ss", "0"]);
+        if (o.Start is not null && o.HasAudio && string.Equals(o.AudioCodec, "copy", StringComparison.Ordinal)) a.AddRange(["-ss", "0"]);
         if (o.End is { } end) a.AddRange(["-t", Number(end - (o.Start ?? 0))]);
         var graphic = o.BurnSubtitles && o.GraphicSubtitles && o.SubtitleTrack is not null;
         var filters = VideoFilters(o);
@@ -64,21 +64,21 @@ public static class FfmpegArguments
         switch (o.VideoCodec)
         {
             case "av1":
-                a.AddRange(["-c:v", "libaom-av1", "-cpu-used", o.Multithreading == "no-mt" ? "0" : "4"]);
-                if (o.Multithreading != "no-mt")
+                a.AddRange(["-c:v", "libaom-av1", "-cpu-used", string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "4"]);
+                if (!string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal))
                 {
                     var tiles = (int)Math.Ceiling(Math.Log2(Math.Max(1, o.Threads)) / 2);
                     var cols = Math.Min(tiles, (int)Math.Floor(Math.Log2(Math.Max(1, (o.FinalWidth + 63) / 64.0))));
                     var rows = Math.Min(tiles, (int)Math.Floor(Math.Log2(Math.Max(1, (o.FinalHeight + 63) / 64.0))));
-                    a.AddRange(["-tile-columns", cols.ToString(), "-tile-rows", rows.ToString()]);
+                    a.AddRange(["-tile-columns", cols.ToString(System.Globalization.CultureInfo.InvariantCulture), "-tile-rows", rows.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
                 }
-                if (o.Multithreading == "row-mt") a.AddRange(["-row-mt", "1"]);
+                if (string.Equals(o.Multithreading, "row-mt", StringComparison.Ordinal)) a.AddRange(["-row-mt", "1"]);
                 a.AddRange(["-strict", "experimental"]);
                 break;
             case "vp9":
-                a.AddRange(["-c:v", "libvpx-vp9", "-speed", o.Multithreading == "no-mt" ? "0" : "1",
-                    "-tile-columns", o.Multithreading == "no-mt" ? "0" : "6"]);
-                if (o.Multithreading == "row-mt") a.AddRange(["-row-mt", "1"]);
+                a.AddRange(["-c:v", "libvpx-vp9", "-speed", string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "1",
+                    "-tile-columns", string.Equals(o.Multithreading, "no-mt", StringComparison.Ordinal) ? "0" : "6"]);
+                if (string.Equals(o.Multithreading, "row-mt", StringComparison.Ordinal)) a.AddRange(["-row-mt", "1"]);
                 a.AddRange(["-frame-parallel", "0"]);
                 break;
             case "vp8": a.AddRange(["-c:v", "libvpx", "-speed", "0"]); break;
@@ -87,17 +87,17 @@ public static class FfmpegArguments
         a.AddRange(["-b:v", o.VideoBitrate is { } bitrate ? $"{bitrate}k" : "0"]);
         if (o.Quality is { } quality)
         {
-            a.AddRange(["-crf", quality.ToString()]);
-            if (o.VideoCodec == "vp8" && quality < 4) a.AddRange(["-qmin", "0"]);
-            if (o.VideoCodec == "vp9" && quality == 0) a.AddRange(["-lossless", "1"]);
+            a.AddRange(["-crf", quality.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+            if (string.Equals(o.VideoCodec, "vp8", StringComparison.Ordinal) && quality < 4) a.AddRange(["-qmin", "0"]);
+            if (string.Equals(o.VideoCodec, "vp9", StringComparison.Ordinal) && quality == 0) a.AddRange(["-lossless", "1"]);
         }
         a.AddRange(["-preset", o.Preset]);
-        if (o.VideoCodec != "x264") a.AddRange(["-auto-alt-ref", "1", "-lag-in-frames", "25", "-g", "128"]);
+        if (!string.Equals(o.VideoCodec, "x264", StringComparison.Ordinal)) a.AddRange(["-auto-alt-ref", "1", "-lag-in-frames", "25", "-g", "128"]);
         a.AddRange(["-pix_fmt", "yuv420p"]);
         if (!graphic && filters.Count > 0) a.AddRange(["-vf", string.Join(',', filters)]);
         if (o.HasAudio)
         {
-            if (o.AudioCodec == "copy") a.AddRange(["-c:a", "copy"]);
+            if (string.Equals(o.AudioCodec, "copy", StringComparison.Ordinal)) a.AddRange(["-c:a", "copy"]);
             else
             {
                 switch (o.AudioCodec)
@@ -114,7 +114,7 @@ public static class FfmpegArguments
                 if (audio.Count > 0) a.AddRange(["-af", string.Join(',', audio)]);
             }
         }
-        a.AddRange(["-f", o.VideoCodec == "x264" ? "mp4" : "webm"]);
+        a.AddRange(["-f", string.Equals(o.VideoCodec, "x264", StringComparison.Ordinal) ? "mp4" : "webm"]);
         return a.ToArray();
     }
 
@@ -164,16 +164,16 @@ public static class FfmpegArguments
 
     public static string[] BuildTest(string[] raw, string output)
     {
-        var stripped = new HashSet<string> { "-b:v", "-speed", "-cpu-used", "-row-mt", "-tile-columns",
+        var stripped = new HashSet<string>(StringComparer.Ordinal) { "-b:v", "-speed", "-cpu-used", "-row-mt", "-tile-columns",
             "-tile-rows", "-frame-parallel", "-auto-alt-ref", "-lag-in-frames", "-strict", "-g",
             "-crf", "-lossless", "-qmin" };
         var args = new List<string>();
         for (var i = 0; i < raw.Length; i++)
         {
             if (stripped.Contains(raw[i])) { i++; continue; }
-            if (raw[i] == "-f") { i++; continue; }
-            if (raw[i] == "-c:v") { args.AddRange(["-c:v", "libx264"]); i++; continue; }
-            if (raw[i] == "-preset") { args.AddRange(["-preset", "ultrafast"]); i++; continue; }
+            if (string.Equals(raw[i], "-f", StringComparison.Ordinal)) { i++; continue; }
+            if (string.Equals(raw[i], "-c:v", StringComparison.Ordinal)) { args.AddRange(["-c:v", "libx264"]); i++; continue; }
+            if (string.Equals(raw[i], "-preset", StringComparison.Ordinal)) { args.AddRange(["-preset", "ultrafast"]); i++; continue; }
             args.Add(raw[i]);
         }
         if (!args.Contains("-c:v")) args.AddRange(["-c:v", "libx264"]);
