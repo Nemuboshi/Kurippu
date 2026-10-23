@@ -6,7 +6,11 @@ public static class Program
     {
         try
         {
-            return new PackagingCommand(new RuntimeStager()).Run(args, CancellationToken.None);
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+            var stager = new RuntimeStager(
+                new HttpAssetDownloader(client),
+                new ExternalProcessRunner());
+            return new PackagingCommand(stager).Run(args, CancellationToken.None);
         }
         catch (PackagingException exception)
         {
