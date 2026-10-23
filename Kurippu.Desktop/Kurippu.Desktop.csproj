@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PackageOutputDirectory Condition="'$(PackageOutputDirectory)' == ''">$(MSBuildProjectDirectory)/../publish/$(RuntimeIdentifier)</PackageOutputDirectory>
+    <PackagingProject>$(MSBuildProjectDirectory)/../Kurippu.Packaging/Kurippu.Packaging.csproj</PackagingProject>
+    <PackagingTool>$(MSBuildProjectDirectory)/../Kurippu.Packaging/bin/$(Configuration)/net10.0/Kurippu.Packaging.dll</PackagingTool>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,4 +24,20 @@
   <ItemGroup>
     <ProjectReference Include="..\Kurippu.Core\Kurippu.Core.csproj" />
   </ItemGroup>
+
+  <Target Name="ValidatePackageRuntimeIdentifier">
+    <Error Condition="'$(RuntimeIdentifier)' == ''"
+           Text="Package requires -r/--runtime. Supported RIDs: win-x64;osx-x64;osx-arm64;linux-x64." />
+  </Target>
+
+  <Target Name="Package" DependsOnTargets="ValidatePackageRuntimeIdentifier;Restore;Build">
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Restore;Publish"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=true;PublishDir=$(PackageOutputDirectory)" />
+    <MSBuild Projects="$(PackagingProject)"
+             Targets="Restore;Build"
+             RemoveProperties="RuntimeIdentifier;SelfContained;PublishDir;PackageOutputDirectory"
+             Properties="Configuration=$(Configuration)" />
+    <Exec Command="dotnet &quot;$(PackagingTool)&quot; stage &quot;$(RuntimeIdentifier)&quot; &quot;$(PackageOutputDirectory)&quot;" />
+  </Target>
 </Project>

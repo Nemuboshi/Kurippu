@@ -33,22 +33,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libmpv-dev patchelf xvfb
-      - name: Restore and test
+      - name: Test
         run: dotnet test Kurippu.slnx -c Release
-      - name: Packaging script tests
-        run: python -m unittest discover -s scripts -p 'test_*.py'
-      - name: Publish
-        run: dotnet publish Kurippu.Desktop/Kurippu.Desktop.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o publish/${{ matrix.rid }}
-      - name: Stage native runtime
-        run: python scripts/stage_runtime.py ${{ matrix.rid }} publish/${{ matrix.rid }}
+      - name: Package
+        run: dotnet msbuild Kurippu.Desktop/Kurippu.Desktop.csproj -t:Package -p:Configuration=Release -p:RuntimeIdentifier=${{ matrix.rid }}
       - name: Measure and package
         shell: bash
         run: |
           du -sh publish/${{ matrix.rid }}
-          cd publish
-          tar -czf ../../kurippu-${{ matrix.rid }}.tar.gz ${{ matrix.rid }}
-          ls -lh ../../kurippu-${{ matrix.rid }}.tar.gz
-          cd ../..
+          tar -czf kurippu-${{ matrix.rid }}.tar.gz -C publish ${{ matrix.rid }}
+          ls -lh kurippu-${{ matrix.rid }}.tar.gz
           mkdir -p extracted
           tar -xzf kurippu-${{ matrix.rid }}.tar.gz -C extracted
       - name: Extracted artifact smoke (Windows)
