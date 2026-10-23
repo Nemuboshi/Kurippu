@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Kurippu.Core.Tests/Kurippu.Core.Tests.csproj" />
+  <Project Path="Kurippu.Core/Kurippu.Core.csproj" />
+  <Project Path="Kurippu.Desktop.Tests/Kurippu.Desktop.Tests.csproj" />
+  <Project Path="Kurippu.Desktop/Kurippu.Desktop.csproj" />
+</Solution>

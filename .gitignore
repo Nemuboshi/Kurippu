@@ -5,6 +5,11 @@ node_modules/
 dist/
 out/
 bin/
+obj/
 .pi/
 .vitest/
 native/mpv/build/
+publish/
+extracted/
+scripts/__pycache__/
+.superpowers/
