@@ -28,16 +28,25 @@ Build locally with .NET 10:
 ```sh
 dotnet test Kurippu.slnx
 dotnet run --project Kurippu.Desktop
-dotnet publish Kurippu.Desktop/Kurippu.Desktop.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64
-python scripts/stage_runtime.py win-x64 publish/win-x64
+dotnet msbuild Kurippu.Desktop/Kurippu.Desktop.csproj -restore -t:Package -p:Configuration=Release -p:RuntimeIdentifier=win-x64
 publish/win-x64/Kurippu.Desktop.exe --smoke
 ```
 
 Substitute `osx-x64`, `osx-arm64`, or `linux-x64` on matching runners. The
-staging script verifies pinned FFmpeg downloads and collects native libmpv
-dependencies from Homebrew or the Linux build runner. `--smoke` creates a
-sample, opens/renders it with libmpv, and exercises one-pass, two-pass, test,
-and preview-concat FFmpeg exports. `--ui-smoke` starts then closes a window.
+`Package` target publishes the desktop app and then runs the C#
+`Kurippu.Packaging` tool, which verifies pinned FFmpeg downloads and collects
+native libmpv dependencies from Homebrew or the Linux build runner. `Package`
+requires network access; an ordinary `dotnet publish` does not download or
+stage runtime assets. The lower-level two-step form is:
+
+```sh
+dotnet publish Kurippu.Desktop/Kurippu.Desktop.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64
+dotnet run --project Kurippu.Packaging -- stage win-x64 publish/win-x64
+```
+
+`--smoke` creates a sample, opens/renders it with libmpv, and exercises
+one-pass, two-pass, test, and preview-concat FFmpeg exports. `--ui-smoke`
+starts then closes a window.
 The CI workflow archives each RID separately, measures its size,
 extracts it, then runs native, empty-window, and real-file UI smoke modes
 (`--smoke`, `--ui-smoke`, `--ui-open-smoke`) from the extracted artifact. Release

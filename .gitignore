@@ -11,5 +11,4 @@ obj/
 native/mpv/build/
 publish/
 extracted/
-scripts/__pycache__/
 .superpowers/
