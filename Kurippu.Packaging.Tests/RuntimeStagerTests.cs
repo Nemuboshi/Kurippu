@@ -39,6 +39,7 @@ public sealed class RuntimeStagerTests
     [Fact]
     public async Task Nonzero_ffmpeg_version_check_is_an_error()
     {
+        if (!OperatingSystem.IsLinux()) return;
         using var fixture = new StagerFixture();
         fixture.CreateLinuxArchive();
         var runner = new FakeProcessRunner(new ProcessResult(1, "bad", "failed"));

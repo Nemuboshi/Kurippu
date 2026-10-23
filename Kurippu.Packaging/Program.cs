@@ -7,9 +7,11 @@ public static class Program
         try
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+            var processRunner = new ExternalProcessRunner();
             var stager = new RuntimeStager(
                 new HttpAssetDownloader(client),
-                new ExternalProcessRunner());
+                processRunner,
+                new NativeDependencyStager(processRunner));
             return new PackagingCommand(stager).Run(args, CancellationToken.None);
         }
         catch (PackagingException exception)

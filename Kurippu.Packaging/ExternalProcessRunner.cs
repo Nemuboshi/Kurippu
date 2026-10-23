@@ -44,6 +44,9 @@ public sealed class ExternalProcessRunner : IProcessRunner
         var result = new ProcessResult(process.ExitCode, await standardOutput,
             await standardError);
         cancellationToken.ThrowIfCancellationRequested();
+        if (result.ExitCode != 0)
+            throw MacNativeDependencyInspector.ProcessFailure(fileName,
+                string.Join(' ', arguments), result);
         return result;
     }
 }

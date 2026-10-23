@@ -2,11 +2,13 @@ namespace Kurippu.Packaging;
 
 public sealed class RuntimeStager(
     IAssetDownloader downloader,
-    IProcessRunner processRunner) : IPackagingStager
+    IProcessRunner processRunner,
+    NativeDependencyStager? nativeDependencyStager = null) : IPackagingStager
 {
     public async Task StageAsync(string rid, string outputDirectory,
         CancellationToken cancellationToken)
     {
+        ValidateHost(rid);
         var asset = RuntimeAssetCatalog.Get(rid);
         var output = Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(output);
@@ -41,11 +43,36 @@ public sealed class RuntimeStager(
 
             if (rid == "win-x64")
                 await StageWindowsMpv(asset, output, scratch, cancellationToken);
+            else if (nativeDependencyStager is not null)
+            {
+                if (rid.StartsWith("osx-", StringComparison.Ordinal))
+                    await nativeDependencyStager.StageMacOSAsync(output, cancellationToken);
+                else
+                    await nativeDependencyStager.StageLinuxAsync(output, cancellationToken);
+            }
         }
         finally
         {
             if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
         }
+    }
+
+    private static void ValidateHost(string rid)
+    {
+        if (rid.StartsWith("osx-", StringComparison.Ordinal) && !OperatingSystem.IsMacOS())
+            throw new PackagingException(
+                $"RID {rid} must be packaged on macOS; current host is {CurrentHost()}.");
+        if (rid == "linux-x64" && !OperatingSystem.IsLinux())
+            throw new PackagingException(
+                $"RID {rid} must be packaged on Linux; current host is {CurrentHost()}.");
+    }
+
+    private static string CurrentHost()
+    {
+        if (OperatingSystem.IsWindows()) return "windows";
+        if (OperatingSystem.IsMacOS()) return "macos";
+        if (OperatingSystem.IsLinux()) return "linux";
+        return "unknown";
     }
 
     private async Task StageWindowsMpv(RuntimeAsset asset, string output, string scratch,
